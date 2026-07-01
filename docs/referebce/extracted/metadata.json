@@ -1,0 +1,6 @@
+{
+  "name": "Citas Salón",
+  "description": "Gestiona citas de salón de belleza, controla empleados y envía recordatorios automáticos por WhatsApp.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

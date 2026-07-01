@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Center group to keep within the safe zone of adaptive icons (72dp safe area centered) -->
+    <group
+        android:translateX="18"
+        android:translateY="18">
+        
+        <!-- Premium elegant outer floral/leaves pattern -->
+        <path
+            android:fillColor="#D4AF37"
+            android:pathData="M36,12 C39,22 47,28 54,30 C47,32 39,38 36,48 C33,38 25,32 18,30 C25,28 33,22 36,12 Z" />
+            
+        <!-- Inner contrasting gold diamond -->
+        <path
+            android:fillColor="#E5C158"
+            android:pathData="M36,24 C37.5,29 41.5,32 45,33 C41.5,34 37.5,37 36,42 C34.5,37 30.5,34 27,33 C30.5,32 34.5,29 36,24 Z" />
+
+        <!-- Accent circles representing sparkles/stars -->
+        <path
+            android:fillColor="#D4AF37"
+            android:pathData="M36,56 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" />
+        <path
+            android:fillColor="#D4AF37"
+            android:pathData="M36,6 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" />
+        <path
+            android:fillColor="#D4AF37"
+            android:pathData="M12,30 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" />
+        <path
+            android:fillColor="#D4AF37"
+            android:pathData="M60,30 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" />
+    </group>
+</vector>
