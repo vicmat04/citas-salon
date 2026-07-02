@@ -2,14 +2,14 @@ import { ReactNode } from "react"
 import Link from "next/link"
 import { Calendar, LayoutDashboard, Settings, Users, Scissors, Store, Home } from "lucide-react"
 
-export default function SalonLayout({
+export default async function SalonLayout({
   children,
   params,
 }: {
   children: ReactNode
-  params: { slug: string }
+  params: Promise<{ slug: string }>
 }) {
-  const { slug } = params
+  const { slug } = await params
 
   return (
     <div className="flex min-h-screen bg-background">

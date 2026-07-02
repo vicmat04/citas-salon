@@ -4,7 +4,8 @@ import { CheckCircle, Calendar, Clock, MapPin, MessageSquare } from "lucide-reac
 import Link from "next/link"
 import { mockSalonInfo } from "@/lib/mock-data"
 
-export default function PublicConfirmationPage({ params }: { params: { slug: string } }) {
+export default async function PublicConfirmationPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
   return (
     <div className="min-h-screen bg-muted/30 py-12 px-4 sm:px-6 flex items-center justify-center">
       <Card className="max-w-md w-full border-primary/20 shadow-lg">
@@ -14,7 +15,7 @@ export default function PublicConfirmationPage({ params }: { params: { slug: str
           </div>
           <CardTitle className="text-2xl">¡Cita Pre-Reservada!</CardTitle>
           <CardDescription>
-            Tu reserva en <span className="font-semibold text-foreground capitalize">{params.slug.replace('-', ' ')}</span> casi está lista.
+            Tu reserva en <span className="font-semibold text-foreground capitalize">{slug.replace('-', ' ')}</span> casi está lista.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 pt-4">
@@ -54,7 +55,7 @@ export default function PublicConfirmationPage({ params }: { params: { slug: str
             <MessageSquare className="mr-2 h-5 w-5" />
             Confirmar por WhatsApp
           </Link>
-          <Link href={`/${params.slug}`} className={buttonVariants({ variant: "ghost", className: "w-full" })}>
+          <Link href={`/${slug}`} className={buttonVariants({ variant: "ghost", className: "w-full" })}>
             Volver al salón
           </Link>
         </CardFooter>

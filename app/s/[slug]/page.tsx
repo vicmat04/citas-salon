@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 
-export default function SalonIndexPage({ params }: { params: { slug: string } }) {
-  redirect(`/s/${params.slug}/dashboard`)
+export default async function SalonIndexPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
+  redirect(`/s/${slug}/dashboard`)
 }

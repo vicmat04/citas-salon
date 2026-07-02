@@ -4,7 +4,8 @@ import { mockAppointments, mockServices, mockSpecialists } from "@/lib/mock-data
 import Link from "next/link"
 import { buttonVariants } from "@/components/ui/button"
 
-export default function SalonDashboardPage({ params }: { params: { slug: string } }) {
+export default async function SalonDashboardPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -48,7 +49,7 @@ export default function SalonDashboardPage({ params }: { params: { slug: string 
             <LinkIcon className="h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <Link href={`/book/${params.slug}`} target="_blank" className={buttonVariants({ variant: "secondary", className: "w-full mt-2" })}>
+            <Link href={`/book/${slug}`} target="_blank" className={buttonVariants({ variant: "secondary", className: "w-full mt-2" })}>
               Abrir reservas
             </Link>
           </CardContent>

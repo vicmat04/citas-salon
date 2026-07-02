@@ -4,7 +4,8 @@ import { MapPin, Scissors } from "lucide-react"
 import Link from "next/link"
 import { mockSalonInfo, mockServices } from "@/lib/mock-data"
 
-export default function PublicSalonLandingPage({ params }: { params: { slug: string } }) {
+export default async function PublicSalonLandingPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
@@ -13,12 +14,12 @@ export default function PublicSalonLandingPage({ params }: { params: { slug: str
           <Scissors className="h-10 w-10 text-primary" />
         </div>
         <h1 className="text-4xl font-extrabold tracking-tight mb-4 capitalize">
-          {params.slug.replace('-', ' ')}
+          {slug.replace('-', ' ')}
         </h1>
         <p className="text-xl text-muted-foreground max-w-lg mx-auto mb-8">
           {mockSalonInfo.slogan}
         </p>
-        <Link href={`/book/${params.slug}`} className={buttonVariants({ size: "lg", className: "rounded-full px-8" })}>
+        <Link href={`/book/${slug}`} className={buttonVariants({ size: "lg", className: "rounded-full px-8" })}>
           Reservar Cita Ahora
         </Link>
       </div>
@@ -51,7 +52,7 @@ export default function PublicSalonLandingPage({ params }: { params: { slug: str
         </div>
 
         <div className="text-center">
-          <Link href={`/book/${params.slug}`} className={buttonVariants({ size: "lg", className: "rounded-full px-8 w-full sm:w-auto" })}>
+          <Link href={`/book/${slug}`} className={buttonVariants({ size: "lg", className: "rounded-full px-8 w-full sm:w-auto" })}>
             Agenda tu visita
           </Link>
         </div>
