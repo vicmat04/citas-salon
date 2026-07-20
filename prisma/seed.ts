@@ -2,6 +2,8 @@ import { PrismaClient } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
 import { createClient } from '@supabase/supabase-js'
+import WebSocket from 'ws'
+;(globalThis as any).WebSocket = WebSocket
 
 const connectionString = process.env.DATABASE_URL
 const pool = new Pool({ connectionString })
