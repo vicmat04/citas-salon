@@ -2,11 +2,15 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 
 export async function loginWithEmail(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
   const nextUrl = formData.get('next') as string || '/login'
+
+  const headersList = await headers()
+  const referer = headersList.get('referer') || '/login'
 
   const supabase = await createClient()
 
@@ -16,7 +20,9 @@ export async function loginWithEmail(formData: FormData) {
   })
 
   if (error) {
-    return redirect(`${nextUrl}?error=${encodeURIComponent(error.message)}`)
+    const url = new URL(referer)
+    url.searchParams.set('error', error.message)
+    return redirect(url.toString())
   }
 
   return redirect(nextUrl)
