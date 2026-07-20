@@ -1,6 +1,8 @@
 import { ReactNode } from "react"
 import Link from "next/link"
-import { Calendar, LayoutDashboard, Settings, Users, Scissors, Store, Home } from "lucide-react"
+import { Calendar, LayoutDashboard, Settings, Users, Scissors, Store, Home, LogOut } from "lucide-react"
+import { requireSalonOwner } from "@/lib/auth/helpers"
+import { signOut } from "@/app/actions/auth"
 
 export default async function SalonLayout({
   children,
@@ -10,6 +12,8 @@ export default async function SalonLayout({
   params: Promise<{ slug: string }>
 }) {
   const { slug } = await params
+  const { dbUser, salon } = await requireSalonOwner(slug)
+
 
   return (
     <div className="flex min-h-screen bg-background">

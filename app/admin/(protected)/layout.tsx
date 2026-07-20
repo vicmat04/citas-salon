@@ -1,8 +1,12 @@
 import { ReactNode } from "react"
 import Link from "next/link"
-import { Calendar, LayoutDashboard, Settings, Store, Users } from "lucide-react"
+import { Calendar, LayoutDashboard, Settings, Store, Users, LogOut } from "lucide-react"
+import { requireAdmin } from "@/lib/auth/helpers"
+import { signOut } from "@/app/actions/auth"
 
-export default function AdminLayout({ children }: { children: ReactNode }) {
+export default async function AdminLayout({ children }: { children: ReactNode }) {
+  const { dbUser } = await requireAdmin()
+
   return (
     <div className="flex min-h-screen bg-background">
       {/* Sidebar */}
