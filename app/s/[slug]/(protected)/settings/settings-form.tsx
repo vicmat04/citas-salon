@@ -1,24 +1,23 @@
 'use client'
 
-import { useState, useTransition } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Button } from "@/components/ui/button"
-import { updateSalonSettings } from '@/app/actions/owner'
+import type { Salon } from '@prisma/client'
+import { useTransition } from 'react'
 import { toast } from 'sonner'
 
-export function SettingsForm({ salon, slug }: { salon: any, slug: string }) {
+import { updateSalonSettings } from '@/app/actions/owner'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+
+export function SettingsForm({ salon, slug }: { salon: Salon; slug: string }) {
   const [isPending, startTransition] = useTransition()
 
   const handleSubmit = async (formData: FormData) => {
     startTransition(async () => {
-      const result = await updateSalonSettings(formData, salon.id, slug)
-      if (result?.error) {
-        toast.error(result.error)
-      } else {
-        toast.success("Configuración actualizada correctamente.")
-      }
+      const result = await updateSalonSettings(formData, slug)
+      if (result.error) toast.error(result.error)
+      else toast.success('Configuración actualizada correctamente.')
     })
   }
 

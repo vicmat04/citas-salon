@@ -4,14 +4,19 @@ import { Badge } from "@/components/ui/badge"
 import { CheckCircle2 } from "lucide-react"
 import Link from "next/link"
 import { mockServices } from "@/lib/mock-data"
+import { requireOperationalPublicSalon } from "@/lib/salons/lifecycle"
 
 export default async function PublicBookingWizardPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
+  const salon = await requireOperationalPublicSalon(slug)
+
+  // This booking flow is mock-only. A future availability or booking write must
+  // re-read operational status inside the same authoritative write transaction.
   return (
     <div className="min-h-screen bg-muted/30 py-8 px-4 sm:px-6">
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold capitalize">{slug.replace('-', ' ')}</h1>
+          <h1 className="text-3xl font-bold capitalize">{salon.name}</h1>
           <p className="text-muted-foreground mt-2">Paso 1: Selecciona tus servicios</p>
         </div>
 

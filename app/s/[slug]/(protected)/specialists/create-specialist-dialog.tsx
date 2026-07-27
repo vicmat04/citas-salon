@@ -1,24 +1,25 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { createSpecialist } from '@/app/actions/owner'
 import { toast } from 'sonner'
 
-export function CreateSpecialistDialog({ salonId, slug }: { salonId: string, slug: string }) {
+import { createSpecialist } from '@/app/actions/owner'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+
+export function CreateSpecialistDialog({ slug }: { slug: string }) {
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   const handleSubmit = async (formData: FormData) => {
     startTransition(async () => {
-      const res = await createSpecialist(formData, salonId, slug)
-      if (res?.error) {
-        toast.error(res.error)
+      const result = await createSpecialist(formData, slug)
+      if (result.error) {
+        toast.error(result.error)
       } else {
-        toast.success("Especialista creado correctamente.")
+        toast.success('Especialista creado correctamente.')
         setOpen(false)
       }
     })
@@ -32,9 +33,7 @@ export function CreateSpecialistDialog({ salonId, slug }: { salonId: string, slu
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Añadir Nuevo Especialista</DialogTitle>
-          <DialogDescription>
-            Registra un nuevo miembro del equipo en tu salón.
-          </DialogDescription>
+          <DialogDescription>Registra un nuevo miembro del equipo en tu salón.</DialogDescription>
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4 py-4">
           <div className="space-y-2">
@@ -53,7 +52,6 @@ export function CreateSpecialistDialog({ salonId, slug }: { salonId: string, slu
             <Label htmlFor="phone">Teléfono (Opcional)</Label>
             <Input id="phone" name="phone" type="text" placeholder="6000-0000" />
           </div>
-          
           <DialogFooter className="pt-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isPending}>
               Cancelar

@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "supabase-citas-salon": {
+      "url": "https://mcp.supabase.com/mcp?project_ref=tlvfgexjerzcynxbgkeu&read_only=true&features=database,docs"
+    }
+  }
+}

@@ -1,36 +1,77 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Citas Salón (MisCitasApp)
 
-## Getting Started
+Plataforma SaaS para la gestión de reservas y citas de salones de belleza, estéticas y barberías, desarrollada con Next.js y Supabase.
 
-First, run the development server:
+## Características Principales y Roles
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Clientes Finales**: Reserva pública de citas sin necesidad de registro ni autenticación (solo ingresan nombre, email y teléfono). Visualización de servicios, selección de personal y disponibilidad en tiempo real.
+- **Dueños/Staff (Negocios)**: Requieren autenticación. Panel de administración exclusivo para la gestión de su salón (calendario de citas, personal, horarios, servicios y reservas). Sin acceso ni visibilidad a funciones globales del SaaS.
+- **SuperAdmin**: Requiere autenticación de nivel administrador. Gestión global del SaaS, salones y suscripciones (completamente aislado e invisible para dueños de salones y clientes).
+
+## Stack Tecnológico
+
+- **Framework**: Next.js (App Router)
+- **Lenguaje**: TypeScript
+- **Estilos y Componentes**: Tailwind CSS, shadcn/ui
+- **Base de Datos y ORM**: PostgreSQL, Prisma ORM
+- **Autenticación y Backend**: Supabase
+
+## Requisitos Previos
+
+- Node.js (v18+)
+- Administrador de paquetes (npm / yarn / pnpm)
+- Proyecto en Supabase configurado (con Auth y Base de Datos)
+
+## Configuración de Variables de Entorno
+
+Crea un archivo `.env` o `.env.local` en la raíz del proyecto y añade las siguientes variables con tus propias credenciales:
+
+```env
+# Prisma
+DATABASE_URL="postgres://..."
+DIRECT_URL="postgres://..."
+
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL="https://..."
+NEXT_PUBLIC_SUPABASE_ANON_KEY="ey..."
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Guía de Inicio Rápido
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Ejecuta los siguientes comandos para levantar el entorno de desarrollo:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+# Clonar el repositorio
+git clone <url-repo>
+cd citas-salon
 
-## Learn More
+# Instalar dependencias
+npm install
 
-To learn more about Next.js, take a look at the following resources:
+# Generar cliente de Prisma
+npx prisma generate
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Ejecutar el servidor de desarrollo
+npm run dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Abre [http://localhost:3000](http://localhost:3000) en tu navegador para ver la aplicación.
 
-## Deploy on Vercel
+## Comandos de Base de Datos
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `npx prisma db push` o `npx prisma migrate dev`: Aplicar cambios en el esquema de la base de datos a tu proyecto local/remoto.
+- `npx prisma studio`: Explorar la base de datos localmente.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Estructura de Carpetas
+
+```text
+citas-salon/
+├── app/            # Rutas de Next.js (App Router)
+│   ├── [slug]/     # Páginas de reserva de cada salón
+│   ├── admin/      # Panel de control de negocios
+│   └── auth/       # Pantallas de login/registro
+├── components/     # Componentes UI (React, shadcn)
+├── lib/            # Utilidades (config. Prisma, Supabase)
+├── prisma/         # Esquema de la base de datos (schema.prisma)
+└── docs/           # Documentación técnica adicional
+```

@@ -1,97 +1,76 @@
 'use server'
 
-import prisma from '@/lib/db'
-import { requireSalonOwner } from '@/lib/auth/helpers'
 import { revalidatePath } from 'next/cache'
 
-/**
- * 1. Settings Actions
- */
-export async function updateSalonSettings(formData: FormData, salonId: string, slug: string) {
-  try {
-    // Validar seguridad: el usuario actual es realmente dueño de ESTE salón
-    await requireSalonOwner(slug)
+import { requireSalonOwner } from '@/lib/auth/helpers'
+import prisma from '@/lib/db'
 
-    const name = formData.get('name') as string
-    const slogan = formData.get('slogan') as string
-    const phone = formData.get('phone') as string
-    const address = formData.get('address') as string
-    const themeColor = formData.get('themeColor') as string
-
-    if (!name) return { error: 'El nombre es requerido' }
-
-    await prisma.salon.update({
-      where: { id: salonId },
-      data: {
-        name,
-        slogan: slogan || null,
-        phone: phone || null,
-        address: address || null,
-        themeColor: themeColor || '#000000',
-      }
-    })
-
-    revalidatePath(`/s/${slug}/settings`)
-    return { success: true }
-  } catch (error: any) {
-    console.error('Error updating settings:', error)
-    return { error: 'No tienes permisos o ocurrió un error al guardar.' }
-  }
+function stringValue(formData: FormData, key: string): string {
+  const value = formData.get(key)
+  return typeof value === 'string' ? value.trim() : ''
 }
 
-/**
- * 2. Specialists Actions
- */
-export async function createSpecialist(formData: FormData, salonId: string, slug: string) {
+export async function updateSalonSettings(formData: FormData, slug: string) {
+  const { salon } = await requireSalonOwner(slug)
+
+  const name = stringValue(formData, 'name')
+  if (!name) return { error: 'El nombre es requerido' }
+
   try {
-    await requireSalonOwner(slug)
+    await prisma.salon.update({
+      where: { id: salon.id },
+      data: {
+        name,
+        slogan: stringValue(formData, 'slogan') || null,
+        phone: stringValue(formData, 'phone') || null,
+        address: stringValue(formData, 'address') || null,
+        themeColor: stringValue(formData, 'themeColor') || '#000000',
+      },
+    })
+  } catch {
+    return { error: 'Ocurrió un error al guardar la configuración.' }
+  }
 
-    const name = formData.get('name') as string
-    const email = formData.get('email') as string
-    const phone = formData.get('phone') as string
-    const specialty = formData.get('specialty') as string
+  revalidatePath(`/s/${slug}/settings`)
+  return { success: true }
+}
 
-    if (!name) return { error: 'El nombre es requerido' }
+export async function createSpecialist(formData: FormData, slug: string) {
+  const { salon } = await requireSalonOwner(slug)
 
+  const name = stringValue(formData, 'name')
+  if (!name) return { error: 'El nombre es requerido' }
+
+  try {
     await prisma.specialist.create({
       data: {
-        salonId,
+        salonId: salon.id,
         name,
-        email: email || null,
-        phone: phone || null,
-        specialty: specialty || null,
-      }
+        email: stringValue(formData, 'email') || null,
+        phone: stringValue(formData, 'phone') || null,
+        specialty: stringValue(formData, 'specialty') || null,
+      },
     })
-
-    revalidatePath(`/s/${slug}/specialists`)
-    return { success: true }
-  } catch (error: any) {
-    console.error('Error creating specialist:', error)
+  } catch {
     return { error: 'Error al crear el especialista.' }
   }
+
+  revalidatePath(`/s/${slug}/specialists`)
+  return { success: true }
 }
 
-export async function deleteSpecialist(specialistId: string, salonId: string, slug: string) {
+export async function deleteSpecialist(specialistId: string, slug: string) {
+  const { salon } = await requireSalonOwner(slug)
+
   try {
-    await requireSalonOwner(slug)
-    
-    // Validar que el especialista pertenezca a este salón por seguridad
-    const specialist = await prisma.specialist.findUnique({
-      where: { id: specialistId }
+    const deleted = await prisma.specialist.deleteMany({
+      where: { id: specialistId, salonId: salon.id },
     })
-    
-    if (!specialist || specialist.salonId !== salonId) {
-       return { error: 'Especialista no encontrado.' }
-    }
-
-    await prisma.specialist.delete({
-      where: { id: specialistId }
-    })
-
-    revalidatePath(`/s/${slug}/specialists`)
-    return { success: true }
-  } catch (error: any) {
-    console.error('Error deleting specialist:', error)
+    if (deleted.count === 0) return { error: 'Especialista no encontrado.' }
+  } catch {
     return { error: 'Error al eliminar el especialista.' }
   }
+
+  revalidatePath(`/s/${slug}/specialists`)
+  return { success: true }
 }

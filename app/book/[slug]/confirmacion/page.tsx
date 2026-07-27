@@ -3,9 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription }
 import { CheckCircle, Calendar, Clock, MapPin, MessageSquare } from "lucide-react"
 import Link from "next/link"
 import { mockSalonInfo } from "@/lib/mock-data"
+import { requireOperationalPublicSalon } from "@/lib/salons/lifecycle"
 
 export default async function PublicConfirmationPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
+  const salon = await requireOperationalPublicSalon(slug)
+
+  // This confirmation is mock-only. A future booking submission must re-read
+  // operational status inside the same authoritative transaction as its writes.
   return (
     <div className="min-h-screen bg-muted/30 py-12 px-4 sm:px-6 flex items-center justify-center">
       <Card className="max-w-md w-full border-primary/20 shadow-lg">
@@ -15,7 +20,7 @@ export default async function PublicConfirmationPage({ params }: { params: Promi
           </div>
           <CardTitle className="text-2xl">¡Cita Pre-Reservada!</CardTitle>
           <CardDescription>
-            Tu reserva en <span className="font-semibold text-foreground capitalize">{slug.replace('-', ' ')}</span> casi está lista.
+            Tu reserva en <span className="font-semibold text-foreground capitalize">{salon.name}</span> casi está lista.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 pt-4">

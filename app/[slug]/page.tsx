@@ -3,9 +3,14 @@ import { Card, CardContent } from "@/components/ui/card"
 import { MapPin, Scissors } from "lucide-react"
 import Link from "next/link"
 import { mockSalonInfo, mockServices } from "@/lib/mock-data"
+import { requireOperationalPublicSalon } from "@/lib/salons/lifecycle"
 
 export default async function PublicSalonLandingPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
+  const salon = await requireOperationalPublicSalon(slug)
+
+  // This public view is mock-only. A future booking write must re-read the salon's
+  // operational status inside the same authoritative transaction as the write.
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
@@ -14,7 +19,7 @@ export default async function PublicSalonLandingPage({ params }: { params: Promi
           <Scissors className="h-10 w-10 text-primary" />
         </div>
         <h1 className="text-4xl font-extrabold tracking-tight mb-4 capitalize">
-          {slug.replace('-', ' ')}
+          {salon.name}
         </h1>
         <p className="text-xl text-muted-foreground max-w-lg mx-auto mb-8">
           {mockSalonInfo.slogan}

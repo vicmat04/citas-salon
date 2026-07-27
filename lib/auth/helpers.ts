@@ -1,43 +1,34 @@
-import { redirect } from 'next/navigation'
-import { getUser, getDbUser } from './session'
+import { notFound, redirect } from 'next/navigation'
+
+import { isInactiveSalonStatus, isOperationalSalonStatus } from '@/lib/salons/lifecycle'
+import { getDbUser, getUser } from './session'
 
 export async function requireAuth() {
   const user = await getUser()
-  if (!user) {
-    redirect('/login')
-  }
-  
+  if (!user) redirect('/login')
+
   const dbUser = await getDbUser(user.id)
-  if (!dbUser) {
-    redirect('/login')
-  }
+  if (!dbUser) redirect('/login')
 
   return { user, dbUser }
 }
 
 export async function requireAdmin() {
   const { user, dbUser } = await requireAuth()
-
-  if (dbUser.role !== 'platform_admin') {
-    redirect('/login')
-  }
+  if (dbUser.role !== 'platform_admin') redirect('/login')
 
   return { user, dbUser }
 }
 
 export async function requireSalonOwner(slug: string) {
   const { user, dbUser } = await requireAuth()
+  if (dbUser.role !== 'salon_owner') redirect('/login')
 
-  if (dbUser.role !== 'salon_owner') {
-    redirect('/login') // o no autorizado
-  }
+  const salon = dbUser.ownedSalons.find((candidate) => candidate.slug === slug)
+  if (!salon) notFound()
 
-  const ownsSalon = dbUser.ownedSalons.some(salon => salon.slug === slug)
-  if (!ownsSalon) {
-    redirect('/login') // Si no le pertenece el salon
-  }
-
-  const salon = dbUser.ownedSalons.find(s => s.slug === slug)
+  if (isInactiveSalonStatus(salon.status)) redirect(`/s/${slug}/inactive`)
+  if (!isOperationalSalonStatus(salon.status)) notFound()
 
   return { user, dbUser, salon }
 }

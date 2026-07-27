@@ -1,22 +1,109 @@
 'use server'
 
 import prisma from '@/lib/db'
-import { createClient } from '@supabase/supabase-js'
 import { requireAdmin } from '@/lib/auth/helpers'
+import { getDbUser, getUser } from '@/lib/auth/session'
+import type { ActionResult } from '@/lib/actions/result'
+import { supabaseAdmin } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
+import { z } from 'zod'
 
-// Note: We use the service role key here to bypass RLS and allow creating users
-// Since this is a server action, the service role key is never exposed to the client.
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
+export type AdminMutableSalonStatus = 'trial' | 'active' | 'suspended'
+
+const statusUpdateSchema = z.object({
+  salonId: z.string().uuid(),
+  nextStatus: z.enum(['trial', 'active', 'suspended']),
+})
+
+export async function updateSalonStatus(
+  salonId: string,
+  nextStatus: AdminMutableSalonStatus,
+): Promise<ActionResult> {
+  const user = await getUser()
+  const dbUser = user ? await getDbUser(user.id) : null
+
+  if (!dbUser || dbUser.role !== 'platform_admin') {
+    return {
+      ok: false,
+      code: 'UNAUTHORIZED',
+      message: 'No tienes permisos para cambiar el estado del salón.',
     }
   }
-)
+
+  const parsed = statusUpdateSchema.safeParse({ salonId, nextStatus })
+  if (!parsed.success) {
+    return {
+      ok: false,
+      code: 'VALIDATION',
+      message: 'El salón o el estado seleccionado no es válido.',
+    }
+  }
+
+  let transactionResult:
+    | { outcome: 'not-found' }
+    | { outcome: 'unchanged'; slug: string }
+    | { outcome: 'updated'; slug: string }
+
+  try {
+    transactionResult = await prisma.$transaction(async (transaction) => {
+      const currentSalon = await transaction.salon.findUnique({
+        where: { id: parsed.data.salonId },
+        select: { id: true, slug: true, status: true },
+      })
+
+      if (!currentSalon) return { outcome: 'not-found' as const }
+      if (currentSalon.status === parsed.data.nextStatus) {
+        return { outcome: 'unchanged' as const, slug: currentSalon.slug }
+      }
+
+      await transaction.salon.update({
+        where: { id: currentSalon.id },
+        data: { status: parsed.data.nextStatus },
+      })
+      await transaction.auditLog.create({
+        data: {
+          salonId: currentSalon.id,
+          userId: dbUser.id,
+          action: 'salon.status.updated',
+          entityType: 'Salon',
+          entityId: currentSalon.id,
+          metadata: {
+            oldStatus: currentSalon.status,
+            newStatus: parsed.data.nextStatus,
+          },
+        },
+      })
+
+      return { outcome: 'updated' as const, slug: currentSalon.slug }
+    })
+  } catch {
+    return {
+      ok: false,
+      code: 'INTERNAL',
+      message: 'No fue posible actualizar el estado del salón.',
+    }
+  }
+
+  if (transactionResult.outcome === 'not-found') {
+    return {
+      ok: false,
+      code: 'NOT_FOUND',
+      message: 'Salón no encontrado.',
+    }
+  }
+
+  if (transactionResult.outcome === 'updated') {
+    const { slug } = transactionResult
+    revalidatePath('/admin/salons')
+    revalidatePath('/my-salons')
+    revalidatePath(`/${slug}`)
+    revalidatePath(`/book/${slug}`)
+    revalidatePath(`/book/${slug}/confirmacion`)
+    revalidatePath(`/s/${slug}`, 'layout')
+  }
+
+  return { ok: true }
+}
 
 export async function createSalon(formData: FormData) {
   // 1. Verify admin permissions

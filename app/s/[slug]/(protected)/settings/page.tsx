@@ -1,13 +1,13 @@
-import prisma from "@/lib/db"
-import { notFound } from "next/navigation"
-import { SettingsForm } from "./settings-form"
+import { requireSalonOwner } from '@/lib/auth/helpers'
+import { SettingsForm } from './settings-form'
 
-export default async function SalonSettingsPage({ params }: { params: { slug: string } }) {
-  const salon = await prisma.salon.findUnique({
-    where: { slug: params.slug }
-  })
-
-  if (!salon) return notFound()
+export default async function SalonSettingsPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+  const { salon } = await requireSalonOwner(slug)
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -15,8 +15,7 @@ export default async function SalonSettingsPage({ params }: { params: { slug: st
         <h2 className="text-2xl font-bold tracking-tight">Configuración</h2>
         <p className="text-muted-foreground">Ajustes generales de tu salón.</p>
       </div>
-
-      <SettingsForm salon={salon} slug={params.slug} />
+      <SettingsForm salon={salon} slug={slug} />
     </div>
   )
 }

@@ -1,9 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import prisma from "@/lib/db"
 import { CreateSalonDialog } from "./create-salon-dialog"
+import { StatusControl } from "./status-control"
 
 export default async function AdminSalonsPage() {
   const salons = await prisma.salon.findMany({
@@ -58,7 +58,7 @@ export default async function AdminSalonsPage() {
                     </TableCell>
                     <TableCell className="capitalize">{salon.plan?.name || 'Prueba'}</TableCell>
                     <TableCell className="text-right whitespace-nowrap">
-                      <Button variant="outline" size="sm">Ver Detalles</Button>
+                      <StatusControl salonId={salon.id} currentStatus={salon.status} />
                     </TableCell>
                   </TableRow>
                 ))}
