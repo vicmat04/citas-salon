@@ -6,6 +6,7 @@ import {
 	Scissors,
 	Settings,
 	Store,
+	UserCheck,
 	Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -50,6 +51,7 @@ export default async function SalonLayout({
 	const navigation = [
 		{ href: `/s/${slug}/dashboard`, label: "Dashboard", icon: LayoutDashboard },
 		{ href: `/s/${slug}/appointments`, label: "Citas", icon: Calendar },
+		{ href: `/s/${slug}/customers`, label: "Clientes", icon: UserCheck },
 		{ href: `/s/${slug}/services`, label: "Servicios", icon: Scissors },
 		{ href: `/s/${slug}/specialists`, label: "Especialistas", icon: Users },
 		{ href: `/s/${slug}/schedules`, label: "Horarios", icon: Clock },
