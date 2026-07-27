@@ -1,41 +1,75 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { mockAppointments } from "@/lib/mock-data"
+import { requireSalonOwner } from "@/lib/auth/helpers";
+import prisma from "@/lib/db";
+import { dateToTimeString } from "@/lib/salons/schedules";
+import { AppointmentsView } from "./appointments-view";
 
-export default function SalonAppointmentsPage() {
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Citas</h2>
-          <p className="text-muted-foreground">Gestiona tus reservaciones.</p>
-        </div>
-        <Button>Nueva Cita</Button>
-      </div>
+export default async function SalonAppointmentsPage({
+	params,
+}: {
+	params: Promise<{ slug: string }>;
+}) {
+	const { slug } = await params;
+	const { salon } = await requireSalonOwner(slug);
 
-      <div className="grid gap-4">
-        {mockAppointments.map(app => (
-          <Card key={app.id}>
-            <CardContent className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-lg">{app.customerName}</h3>
-                  <Badge variant={app.status === 'confirmed' ? 'default' : 'secondary'}>{app.status}</Badge>
-                </div>
-                <p className="text-muted-foreground">{app.customerPhone}</p>
-                <p className="text-sm">Servicios: {app.serviceNames.join(', ')}</p>
-              </div>
-              
-              <div className="flex flex-col items-start md:items-end space-y-1">
-                <p className="font-semibold text-lg">{app.date} a las {app.startTime}</p>
-                <p className="text-muted-foreground">Especialista: {app.specialistName}</p>
-                <p className="text-primary font-bold">${app.totalPrice.toFixed(2)}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  )
+	const appointments = await prisma.appointment.findMany({
+		where: { salonId: salon.id },
+		include: {
+			customer: true,
+			specialist: { select: { id: true, name: true } },
+			appointmentServices: {
+				include: {
+					service: { select: { id: true, name: true } },
+				},
+			},
+		},
+		orderBy: [{ appointmentDate: "desc" }, { startTime: "desc" }],
+	});
+
+	const specialists = await prisma.specialist.findMany({
+		where: { salonId: salon.id, isActive: true },
+		select: { id: true, name: true },
+		orderBy: { name: "asc" },
+	});
+
+	const services = await prisma.service.findMany({
+		where: { salonId: salon.id, isActive: true },
+		select: { id: true, name: true, price: true, durationMinutes: true },
+		orderBy: { name: "asc" },
+	});
+
+	const formattedAppointments = appointments.map((appt) => ({
+		...appt,
+		appointmentDate: appt.appointmentDate.toISOString(),
+		startTime: dateToTimeString(appt.startTime),
+		endTime: dateToTimeString(appt.endTime),
+		totalPriceSnapshot:
+			typeof appt.totalPriceSnapshot === "object" &&
+			"toNumber" in appt.totalPriceSnapshot
+				? appt.totalPriceSnapshot.toNumber()
+				: Number(appt.totalPriceSnapshot),
+		appointmentServices: appt.appointmentServices.map((as) => ({
+			...as,
+			priceSnapshot:
+				typeof as.priceSnapshot === "object" && "toNumber" in as.priceSnapshot
+					? as.priceSnapshot.toNumber()
+					: Number(as.priceSnapshot),
+		})),
+	}));
+
+	const formattedServices = services.map((s) => ({
+		...s,
+		price:
+			typeof s.price === "object" && "toNumber" in s.price
+				? s.price.toNumber()
+				: Number(s.price),
+	}));
+
+	return (
+		<AppointmentsView
+			slug={slug}
+			appointments={formattedAppointments}
+			specialists={specialists}
+			services={formattedServices}
+		/>
+	);
 }
