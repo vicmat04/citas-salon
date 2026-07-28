@@ -25,6 +25,7 @@ export async function updateSalonSettings(formData: FormData, slug: string) {
 				phone: stringValue(formData, "phone") || null,
 				address: stringValue(formData, "address") || null,
 				themeColor: stringValue(formData, "themeColor") || "#000000",
+				notificationEmails: stringValue(formData, "notificationEmails") || null,
 			},
 		});
 	} catch {

@@ -30,8 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files and local credential instructions (can opt-in for committing if needed)
 .env*
+instructivo_oauth2_saas.md
 
 # vercel
 .vercel

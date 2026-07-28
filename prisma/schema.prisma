@@ -43,6 +43,7 @@ model Salon {
   status             String   @default("pending") // 'pending', 'trial', 'active', 'suspended', 'cancelled'
   bookingRangeDays   Int      @default(15) @map("booking_range_days")
   minAdvanceHours    Int      @default(1) @map("min_advance_hours")
+  notificationEmails String?  @map("notification_emails")
   planId             String?  @map("plan_id")
   adminNotes         String?  @map("admin_notes")
   createdAt          DateTime @default(now()) @map("created_at")
