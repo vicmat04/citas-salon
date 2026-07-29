@@ -40,31 +40,33 @@ export async function updateBusinessHours(
 	}
 
 	try {
-		for (const item of hoursList) {
-			const openTimeDate = timeStringToDate(item.openTime || "09:00");
-			const closeTimeDate = timeStringToDate(item.closeTime || "18:00");
+		await Promise.all(
+			hoursList.map((item) => {
+				const openTimeDate = timeStringToDate(item.openTime || "09:00");
+				const closeTimeDate = timeStringToDate(item.closeTime || "18:00");
 
-			await prisma.businessHours.upsert({
-				where: {
-					salonId_dayOfWeek: {
+				return prisma.businessHours.upsert({
+					where: {
+						salonId_dayOfWeek: {
+							salonId: salon.id,
+							dayOfWeek: item.dayOfWeek,
+						},
+					},
+					create: {
 						salonId: salon.id,
 						dayOfWeek: item.dayOfWeek,
+						openTime: openTimeDate,
+						closeTime: closeTimeDate,
+						isOpen: item.isOpen,
 					},
-				},
-				create: {
-					salonId: salon.id,
-					dayOfWeek: item.dayOfWeek,
-					openTime: openTimeDate,
-					closeTime: closeTimeDate,
-					isOpen: item.isOpen,
-				},
-				update: {
-					openTime: openTimeDate,
-					closeTime: closeTimeDate,
-					isOpen: item.isOpen,
-				},
-			});
-		}
+					update: {
+						openTime: openTimeDate,
+						closeTime: closeTimeDate,
+						isOpen: item.isOpen,
+					},
+				});
+			}),
+		);
 
 		revalidatePath(`/s/${slug}/schedules`);
 		revalidatePath(`/s/${slug}/settings`);
@@ -109,32 +111,34 @@ export async function updateSpecialistHours(
 	}
 
 	try {
-		for (const item of hoursList) {
-			const openTimeDate = timeStringToDate(item.openTime || "09:00");
-			const closeTimeDate = timeStringToDate(item.closeTime || "18:00");
+		await Promise.all(
+			hoursList.map((item) => {
+				const openTimeDate = timeStringToDate(item.openTime || "09:00");
+				const closeTimeDate = timeStringToDate(item.closeTime || "18:00");
 
-			await prisma.specialistHours.upsert({
-				where: {
-					specialistId_dayOfWeek: {
+				return prisma.specialistHours.upsert({
+					where: {
+						specialistId_dayOfWeek: {
+							specialistId,
+							dayOfWeek: item.dayOfWeek,
+						},
+					},
+					create: {
+						salonId: salon.id,
 						specialistId,
 						dayOfWeek: item.dayOfWeek,
+						openTime: openTimeDate,
+						closeTime: closeTimeDate,
+						isAvailable: item.isAvailable,
 					},
-				},
-				create: {
-					salonId: salon.id,
-					specialistId,
-					dayOfWeek: item.dayOfWeek,
-					openTime: openTimeDate,
-					closeTime: closeTimeDate,
-					isAvailable: item.isAvailable,
-				},
-				update: {
-					openTime: openTimeDate,
-					closeTime: closeTimeDate,
-					isAvailable: item.isAvailable,
-				},
-			});
-		}
+					update: {
+						openTime: openTimeDate,
+						closeTime: closeTimeDate,
+						isAvailable: item.isAvailable,
+					},
+				});
+			}),
+		);
 
 		revalidatePath(`/s/${slug}/schedules`);
 		revalidatePath(`/s/${slug}/specialists`);

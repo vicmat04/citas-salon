@@ -118,13 +118,14 @@ export async function createSalon(formData: FormData) {
 		return { error: "Todos los campos son obligatorios" };
 	}
 
-	// 2. Check if slug or email already exists in DB
-	const existingSalon = await prisma.salon.findUnique({ where: { slug } });
+	// 2. Check the independent slug and email constraints concurrently
+	const [existingSalon, existingUser] = await Promise.all([
+		prisma.salon.findUnique({ where: { slug } }),
+		prisma.user.findUnique({ where: { email } }),
+	]);
 	if (existingSalon) {
 		return { error: "El slug ya está en uso" };
 	}
-
-	const existingUser = await prisma.user.findUnique({ where: { email } });
 
 	let supabaseUid = existingUser?.supabaseUid;
 	let dbUser = existingUser;
@@ -227,18 +228,19 @@ export async function extendSalonTrial(
 	}
 
 	try {
-		const salon = await prisma.salon.findUnique({
-			where: { id: salonId },
-			include: { owner: true },
-		});
+		const [salon, existingSub] = await Promise.all([
+			prisma.salon.findUnique({
+				where: { id: salonId },
+				include: { owner: true },
+			}),
+			prisma.subscription.findFirst({
+				where: { salonId, status: "trial" },
+				orderBy: { createdAt: "desc" },
+			}),
+		]);
 
 		if (!salon)
 			return { ok: false, code: "NOT_FOUND", message: "Salón no encontrado." };
-
-		const existingSub = await prisma.subscription.findFirst({
-			where: { salonId, status: "trial" },
-			orderBy: { createdAt: "desc" },
-		});
 
 		const baseDate =
 			existingSub?.endDate && existingSub.endDate > new Date()
@@ -354,20 +356,21 @@ export async function sendTrialExpirationNotice(
 	}
 
 	try {
-		const salon = await prisma.salon.findUnique({
-			where: { id: salonId },
-			include: { owner: true },
-		});
+		const [salon, existingSub, { sendTrialExpirationEmail }] =
+			await Promise.all([
+				prisma.salon.findUnique({
+					where: { id: salonId },
+					include: { owner: true },
+				}),
+				prisma.subscription.findFirst({
+					where: { salonId, status: "trial" },
+					orderBy: { createdAt: "desc" },
+				}),
+				import("@/lib/email/mailer"),
+			]);
 
 		if (!salon)
 			return { ok: false, code: "NOT_FOUND", message: "Salón no encontrado." };
-
-		const { sendTrialExpirationEmail } = await import("@/lib/email/mailer");
-
-		const existingSub = await prisma.subscription.findFirst({
-			where: { salonId, status: "trial" },
-			orderBy: { createdAt: "desc" },
-		});
 
 		const remainingDays = existingSub?.endDate
 			? Math.max(

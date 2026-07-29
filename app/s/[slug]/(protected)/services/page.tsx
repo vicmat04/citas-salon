@@ -10,15 +10,16 @@ export default async function SalonServicesPage({
 	const { slug } = await params;
 	const { salon } = await requireSalonOwner(slug);
 
-	const categories = await prisma.serviceCategory.findMany({
-		where: { salonId: salon.id },
-		orderBy: { sortOrder: "asc" },
-	});
-
-	const services = await prisma.service.findMany({
-		where: { salonId: salon.id },
-		orderBy: { createdAt: "desc" },
-	});
+	const [categories, services] = await Promise.all([
+		prisma.serviceCategory.findMany({
+			where: { salonId: salon.id },
+			orderBy: { sortOrder: "asc" },
+		}),
+		prisma.service.findMany({
+			where: { salonId: salon.id },
+			orderBy: { createdAt: "desc" },
+		}),
+	]);
 
 	// Convert Prisma Decimal fields to plain numbers or string for client serializability
 	const serializedServices = services.map((srv) => ({

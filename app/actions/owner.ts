@@ -86,25 +86,26 @@ export async function updateSpecialistServices(
 	const { salon } = await requireSalonOwner(slug);
 
 	try {
-		const specialist = await prisma.specialist.findFirst({
-			where: { id: specialistId, salonId: salon.id },
-		});
+		const [specialist, validServiceCount] = await Promise.all([
+			prisma.specialist.findFirst({
+				where: { id: specialistId, salonId: salon.id },
+			}),
+			serviceIds.length > 0
+				? prisma.service.count({
+						where: {
+							id: { in: serviceIds },
+							salonId: salon.id,
+						},
+					})
+				: Promise.resolve(0),
+		]);
 		if (!specialist) return { error: "Especialista no encontrado." };
 
-		// Verify all serviceIds belong to salon
-		if (serviceIds.length > 0) {
-			const validCount = await prisma.service.count({
-				where: {
-					id: { in: serviceIds },
-					salonId: salon.id,
-				},
-			});
-			if (validCount !== serviceIds.length) {
-				return {
-					error:
-						"Uno o más servicios seleccionados no pertenecen a este salón.",
-				};
-			}
+		if (validServiceCount !== serviceIds.length) {
+			return {
+				error:
+					"Uno o más servicios seleccionados no pertenecen a este salón.",
+			};
 		}
 
 		// Atomically replace SpecialistService relations

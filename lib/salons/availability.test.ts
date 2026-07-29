@@ -5,11 +5,11 @@ const mocks = vi.hoisted(() => ({
 	specialistFindFirst: vi.fn(),
 	specialistFindMany: vi.fn(),
 	salonFindUnique: vi.fn(),
-	blockedDateFindFirst: vi.fn(),
+	blockedDateFindMany: vi.fn(),
 	blockedSlotFindMany: vi.fn(),
 	appointmentFindMany: vi.fn(),
-	specialistHoursFindUnique: vi.fn(),
-	businessHoursFindUnique: vi.fn(),
+	specialistHoursFindMany: vi.fn(),
+	businessHoursFindMany: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -20,11 +20,11 @@ vi.mock("@/lib/db", () => ({
 			findMany: mocks.specialistFindMany,
 		},
 		salon: { findUnique: mocks.salonFindUnique },
-		blockedDate: { findFirst: mocks.blockedDateFindFirst },
+		blockedDate: { findMany: mocks.blockedDateFindMany },
 		blockedSlot: { findMany: mocks.blockedSlotFindMany },
 		appointment: { findMany: mocks.appointmentFindMany },
-		specialistHours: { findUnique: mocks.specialistHoursFindUnique },
-		businessHours: { findUnique: mocks.businessHoursFindUnique },
+		specialistHours: { findMany: mocks.specialistHoursFindMany },
+		businessHours: { findMany: mocks.businessHoursFindMany },
 	},
 }));
 
@@ -42,13 +42,16 @@ describe("availability calculation engine", () => {
 			bookingRangeDays: 15,
 			minAdvanceHours: 1,
 		});
-		mocks.specialistHoursFindUnique.mockResolvedValue(null);
-		mocks.businessHoursFindUnique.mockResolvedValue({
-			isOpen: true,
-			openTime: timeStringToDate("09:00"),
-			closeTime: timeStringToDate("12:00"),
-		});
-		mocks.blockedDateFindFirst.mockResolvedValue(null);
+		mocks.specialistHoursFindMany.mockResolvedValue([]);
+		mocks.businessHoursFindMany.mockResolvedValue([
+			{
+				dayOfWeek: 4,
+				isOpen: true,
+				openTime: timeStringToDate("09:00"),
+				closeTime: timeStringToDate("12:00"),
+			},
+		]);
+		mocks.blockedDateFindMany.mockResolvedValue([]);
 		mocks.blockedSlotFindMany.mockResolvedValue([]);
 		mocks.appointmentFindMany.mockResolvedValue([]);
 	});
@@ -145,6 +148,7 @@ describe("availability calculation engine", () => {
 		// Existing appointment from 09:30 to 10:00
 		mocks.appointmentFindMany.mockResolvedValue([
 			{
+				specialistId: "spec-1",
 				startTime: timeStringToDate("09:30"),
 				endTime: timeStringToDate("10:00"),
 			},
@@ -191,12 +195,19 @@ describe("availability calculation engine", () => {
 		);
 
 		expect(result.slots).toContain("09:30");
-		expect(mocks.appointmentFindMany).toHaveBeenCalledWith({
-			where: expect.objectContaining({
-				salonId: "salon-1",
-				specialistId: "spec-1",
-				id: { not: "appt-1" },
+		expect(mocks.appointmentFindMany).toHaveBeenCalledWith(
+			expect.objectContaining({
+				where: expect.objectContaining({
+					salonId: "salon-1",
+					specialistId: { in: ["spec-1"] },
+					id: { not: "appt-1" },
+				}),
 			}),
-		});
+		);
+		expect(mocks.businessHoursFindMany).toHaveBeenCalledTimes(1);
+		expect(mocks.specialistHoursFindMany).toHaveBeenCalledTimes(1);
+		expect(mocks.blockedDateFindMany).toHaveBeenCalledTimes(1);
+		expect(mocks.blockedSlotFindMany).toHaveBeenCalledTimes(1);
+		expect(mocks.appointmentFindMany).toHaveBeenCalledTimes(1);
 	});
 });

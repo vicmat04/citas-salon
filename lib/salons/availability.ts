@@ -1,9 +1,5 @@
 import prisma from "@/lib/db";
-import {
-	dateToTimeString,
-	resolveEffectiveSpecialistSchedule,
-	timeStringToDate,
-} from "@/lib/salons/schedules";
+import { dateToTimeString, timeStringToDate } from "@/lib/salons/schedules";
 
 export interface AvailableSlotResult {
 	slots: string[];
@@ -134,13 +130,85 @@ export async function getAvailableSlots(
 	);
 	if (candidates.length === 0) return { slots: [] };
 
-	const salon = await prisma.salon.findUnique({
-		where: { id: salonId },
-		select: { bookingRangeDays: true, minAdvanceHours: true },
-	});
+	const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
+	const candidateIds = candidates.map((candidate) => candidate.id);
+	const dayStart = new Date(
+		date.getFullYear(),
+		date.getMonth(),
+		date.getDate(),
+		0,
+		0,
+		0,
+	);
+	const dayEnd = new Date(
+		date.getFullYear(),
+		date.getMonth(),
+		date.getDate() + 1,
+		0,
+		0,
+		0,
+	);
+	const salonOrCandidateFilter = [
+		{ specialistId: null },
+		{ specialistId: { in: candidateIds } },
+	];
+
+	const [
+		salon,
+		businessHours,
+		specialistHours,
+		blockedDates,
+		blockedSlots,
+		existingAppointments,
+	] = await Promise.all([
+		prisma.salon.findUnique({
+			where: { id: salonId },
+			select: { bookingRangeDays: true, minAdvanceHours: true },
+		}),
+		prisma.businessHours.findMany({
+			where: { salonId, dayOfWeek },
+			select: {
+				dayOfWeek: true,
+				openTime: true,
+				closeTime: true,
+				isOpen: true,
+			},
+		}),
+		prisma.specialistHours.findMany({
+			where: {
+				salonId,
+				specialistId: { in: candidateIds },
+				dayOfWeek,
+			},
+			select: {
+				specialistId: true,
+				dayOfWeek: true,
+				openTime: true,
+				closeTime: true,
+				isAvailable: true,
+			},
+		}),
+		prisma.blockedDate.findMany({
+			where: { salonId, date, OR: salonOrCandidateFilter },
+			select: { specialistId: true },
+		}),
+		prisma.blockedSlot.findMany({
+			where: { salonId, date, OR: salonOrCandidateFilter },
+			select: { specialistId: true, startTime: true, endTime: true },
+		}),
+		prisma.appointment.findMany({
+			where: {
+				salonId,
+				specialistId: { in: candidateIds },
+				...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
+				status: { not: "cancelled" },
+				startTime: { gte: dayStart, lt: dayEnd },
+			},
+			select: { specialistId: true, startTime: true, endTime: true },
+		}),
+	]);
 
 	const minAdvanceHours = salon?.minAdvanceHours || 0;
-	const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
 
 	// Calculate cutoff time if booking for today
 	const now = new Date();
@@ -154,65 +222,44 @@ export async function getAvailableSlots(
 		: null;
 
 	const availableSlotsSet = new Set<string>();
+	const salonSchedule = businessHours.find(
+		(hours) => hours.dayOfWeek === dayOfWeek,
+	);
 
 	for (const spec of candidates) {
-		// 1. Check full day block for salon or specialist
-		const fullDayBlock = await prisma.blockedDate.findFirst({
-			where: {
-				salonId,
-				date,
-				OR: [{ specialistId: null }, { specialistId: spec.id }],
-			},
-		});
+		// All availability data is already loaded; only in-memory filtering occurs here.
+		const fullDayBlock = blockedDates.some(
+			(block) => block.specialistId === null || block.specialistId === spec.id,
+		);
 		if (fullDayBlock) continue;
 
-		// 2. Resolve schedule for day of week
-		const schedule = await resolveEffectiveSpecialistSchedule(
-			salonId,
-			spec.id,
-			dayOfWeek,
+		const specialistSchedule = specialistHours.find(
+			(hours) =>
+				hours.specialistId === spec.id && hours.dayOfWeek === dayOfWeek,
 		);
+		const schedule = specialistSchedule
+			? {
+					isAvailable: specialistSchedule.isAvailable,
+					openTime: dateToTimeString(specialistSchedule.openTime),
+					closeTime: dateToTimeString(specialistSchedule.closeTime),
+				}
+			: salonSchedule
+				? {
+						isAvailable: salonSchedule.isOpen,
+						openTime: dateToTimeString(salonSchedule.openTime),
+						closeTime: dateToTimeString(salonSchedule.closeTime),
+					}
+				: { isAvailable: true, openTime: "09:00", closeTime: "18:00" };
 		if (!schedule.isAvailable) continue;
 
 		const openTimeDate = timeStringToDate(schedule.openTime);
 		const closeTimeDate = timeStringToDate(schedule.closeTime);
-
-		// 3. Fetch blocked slots for day
-		const blockedSlots = await prisma.blockedSlot.findMany({
-			where: {
-				salonId,
-				date,
-				OR: [{ specialistId: null }, { specialistId: spec.id }],
-			},
-		});
-
-		// 4. Fetch existing non-cancelled appointments for specialist on date
-		const existingAppointments = await prisma.appointment.findMany({
-			where: {
-				salonId,
-				specialistId: spec.id,
-				...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
-				status: { not: "cancelled" },
-				startTime: {
-					gte: new Date(
-						date.getFullYear(),
-						date.getMonth(),
-						date.getDate(),
-						0,
-						0,
-						0,
-					),
-					lt: new Date(
-						date.getFullYear(),
-						date.getMonth(),
-						date.getDate() + 1,
-						0,
-						0,
-						0,
-					),
-				},
-			},
-		});
+		const specialistBlockedSlots = blockedSlots.filter(
+			(block) => block.specialistId === null || block.specialistId === spec.id,
+		);
+		const specialistAppointments = existingAppointments.filter(
+			(appointment) => appointment.specialistId === spec.id,
+		);
 
 		// Step slots in 30-minute intervals
 		const slotStepMinutes = 30;
@@ -246,7 +293,7 @@ export async function getAvailableSlots(
 
 			// Check overlap with BlockedSlots
 			let isBlockedBySlot = false;
-			for (const block of blockedSlots) {
+			for (const block of specialistBlockedSlots) {
 				const blockStartMs = block.startTime.getTime();
 				const blockEndMs = block.endTime.getTime();
 				if (slotStartMs < blockEndMs && slotEndMs > blockStartMs) {
@@ -264,7 +311,7 @@ export async function getAvailableSlots(
 
 			// Check overlap with existing appointments
 			let isBlockedByAppt = false;
-			for (const appt of existingAppointments) {
+			for (const appt of specialistAppointments) {
 				const apptOpenTime = timeStringToDate(dateToTimeString(appt.startTime));
 				const apptCloseTime = timeStringToDate(dateToTimeString(appt.endTime));
 				const apptStartMs = apptOpenTime.getTime();

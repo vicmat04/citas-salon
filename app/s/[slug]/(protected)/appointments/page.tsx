@@ -12,48 +12,48 @@ export default async function SalonAppointmentsPage({
 	const { slug } = await params;
 	const { salon } = await requireSalonOwner(slug);
 
-	const appointments = await prisma.appointment.findMany({
-		where: { salonId: salon.id },
-		include: {
-			customer: true,
-			specialist: { select: { id: true, name: true } },
-			appointmentServices: {
-				include: {
-					service: { select: { id: true, name: true } },
+	const [appointments, specialists, services] = await Promise.all([
+		prisma.appointment.findMany({
+			where: { salonId: salon.id },
+			include: {
+				customer: true,
+				specialist: { select: { id: true, name: true } },
+				appointmentServices: {
+					include: {
+						service: { select: { id: true, name: true } },
+					},
 				},
-			},
-			notificationEvents: {
-				orderBy: { createdAt: "desc" },
-				take: 5,
-				select: {
-					type: true,
-					createdAt: true,
-					deliveries: {
-						select: {
-							roles: true,
-							status: true,
-							resultCode: true,
-							recipientMasked: true,
-							updatedAt: true,
+				notificationEvents: {
+					orderBy: { createdAt: "desc" },
+					take: 5,
+					select: {
+						type: true,
+						createdAt: true,
+						deliveries: {
+							select: {
+								roles: true,
+								status: true,
+								resultCode: true,
+								recipientMasked: true,
+								updatedAt: true,
+							},
 						},
 					},
 				},
 			},
-		},
-		orderBy: [{ appointmentDate: "desc" }, { startTime: "desc" }],
-	});
-
-	const specialists = await prisma.specialist.findMany({
-		where: { salonId: salon.id, isActive: true },
-		select: { id: true, name: true },
-		orderBy: { name: "asc" },
-	});
-
-	const services = await prisma.service.findMany({
-		where: { salonId: salon.id, isActive: true },
-		select: { id: true, name: true, price: true, durationMinutes: true },
-		orderBy: { name: "asc" },
-	});
+			orderBy: [{ appointmentDate: "desc" }, { startTime: "desc" }],
+		}),
+		prisma.specialist.findMany({
+			where: { salonId: salon.id, isActive: true },
+			select: { id: true, name: true },
+			orderBy: { name: "asc" },
+		}),
+		prisma.service.findMany({
+			where: { salonId: salon.id, isActive: true },
+			select: { id: true, name: true, price: true, durationMinutes: true },
+			orderBy: { name: "asc" },
+		}),
+	]);
 
 	const formattedAppointments = appointments.map((appt) => {
 		const { notificationEvents, ...appointment } = appt;

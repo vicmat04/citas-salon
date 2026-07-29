@@ -10,16 +10,17 @@ export default async function PublicBookingWizardPage({
 	const { slug } = await params;
 	const salon = await requireOperationalPublicSalon(slug);
 
-	const services = await prisma.service.findMany({
-		where: { salonId: salon.id, isActive: true, price: { gt: 0 } },
-		orderBy: { name: "asc" },
-	});
-
-	const specialists = await prisma.specialist.findMany({
-		where: { salonId: salon.id, isActive: true },
-		select: { id: true, name: true, specialty: true },
-		orderBy: { name: "asc" },
-	});
+	const [services, specialists] = await Promise.all([
+		prisma.service.findMany({
+			where: { salonId: salon.id, isActive: true, price: { gt: 0 } },
+			orderBy: { name: "asc" },
+		}),
+		prisma.specialist.findMany({
+			where: { salonId: salon.id, isActive: true },
+			select: { id: true, name: true, specialty: true },
+			orderBy: { name: "asc" },
+		}),
+	]);
 
 	const serializedServices = services.map((s) => ({
 		...s,

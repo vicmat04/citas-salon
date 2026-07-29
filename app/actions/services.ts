@@ -81,15 +81,17 @@ export async function deleteCategory(categoryId: string, slug: string) {
 	const { salon } = await requireSalonOwner(slug);
 
 	try {
-		const existing = await prisma.serviceCategory.findFirst({
-			where: { id: categoryId, salonId: salon.id },
-		});
+		const [existing, servicesCount] = await Promise.all([
+			prisma.serviceCategory.findFirst({
+				where: { id: categoryId, salonId: salon.id },
+			}),
+			prisma.service.count({
+				where: { categoryId, salonId: salon.id },
+			}),
+		]);
 		if (!existing) return { error: "Categoría no encontrada." };
 
 		// Business rule: Cannot delete category if it contains services
-		const servicesCount = await prisma.service.count({
-			where: { categoryId, salonId: salon.id },
-		});
 
 		if (servicesCount > 0) {
 			return {
@@ -192,18 +194,19 @@ export async function updateService(
 	const isActive = formData.get("isActive") !== "false";
 
 	try {
-		const existing = await prisma.service.findFirst({
-			where: { id: serviceId, salonId: salon.id },
-		});
+		const [existing, validCategory] = await Promise.all([
+			prisma.service.findFirst({
+				where: { id: serviceId, salonId: salon.id },
+			}),
+			categoryId
+				? prisma.serviceCategory.findFirst({
+						where: { id: categoryId, salonId: salon.id },
+					})
+				: Promise.resolve(null),
+		]);
 		if (!existing) return { error: "Servicio no encontrado." };
-
-		if (categoryId) {
-			const validCategory = await prisma.serviceCategory.findFirst({
-				where: { id: categoryId, salonId: salon.id },
-			});
-			if (!validCategory)
-				return { error: "Categoría no válida para este salón." };
-		}
+		if (categoryId && !validCategory)
+			return { error: "Categoría no válida para este salón." };
 
 		const updated = await prisma.service.update({
 			where: { id: serviceId },

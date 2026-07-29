@@ -13,15 +13,16 @@ export default async function PublicSalonLandingPage({
 	const { slug } = await params;
 	const salon = await requireOperationalPublicSalon(slug);
 
-	const categories = await prisma.serviceCategory.findMany({
-		where: { salonId: salon.id },
-		orderBy: { sortOrder: "asc" },
-	});
-
-	const services = await prisma.service.findMany({
-		where: { salonId: salon.id, isActive: true, price: { gt: 0 } },
-		orderBy: { name: "asc" },
-	});
+	const [categories, services] = await Promise.all([
+		prisma.serviceCategory.findMany({
+			where: { salonId: salon.id },
+			orderBy: { sortOrder: "asc" },
+		}),
+		prisma.service.findMany({
+			where: { salonId: salon.id, isActive: true, price: { gt: 0 } },
+			orderBy: { name: "asc" },
+		}),
+	]);
 
 	return (
 		<div className="min-h-screen bg-background">

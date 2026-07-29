@@ -10,20 +10,21 @@ export default async function SalonSpecialistsPage({
 	const { slug } = await params;
 	const { salon } = await requireSalonOwner(slug);
 
-	const specialists = await prisma.specialist.findMany({
-		where: { salonId: salon.id },
-		include: {
-			specialistServices: {
-				select: { serviceId: true },
+	const [specialists, services] = await Promise.all([
+		prisma.specialist.findMany({
+			where: { salonId: salon.id },
+			include: {
+				specialistServices: {
+					select: { serviceId: true },
+				},
 			},
-		},
-		orderBy: { createdAt: "desc" },
-	});
-
-	const services = await prisma.service.findMany({
-		where: { salonId: salon.id, isActive: true },
-		orderBy: { name: "asc" },
-	});
+			orderBy: { createdAt: "desc" },
+		}),
+		prisma.service.findMany({
+			where: { salonId: salon.id, isActive: true },
+			orderBy: { name: "asc" },
+		}),
+	]);
 
 	const serializedServices = services.map((s) => ({
 		...s,

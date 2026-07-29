@@ -11,29 +11,33 @@ export default async function SalonSchedulesPage({
 	const { slug } = await params;
 	const { salon } = await requireSalonOwner(slug);
 
-	const businessHours = await prisma.businessHours.findMany({
-		where: { salonId: salon.id },
-	});
-
-	const specialistHours = await prisma.specialistHours.findMany({
-		where: { salonId: salon.id },
-	});
-
-	const specialists = await prisma.specialist.findMany({
-		where: { salonId: salon.id },
-		select: { id: true, name: true },
-		orderBy: { name: "asc" },
-	});
-
-	const blockedDates = await prisma.blockedDate.findMany({
-		where: { salonId: salon.id },
-		orderBy: { date: "asc" },
-	});
-
-	const blockedSlots = await prisma.blockedSlot.findMany({
-		where: { salonId: salon.id },
-		orderBy: { date: "asc" },
-	});
+	const [
+		businessHours,
+		specialistHours,
+		specialists,
+		blockedDates,
+		blockedSlots,
+	] = await Promise.all([
+		prisma.businessHours.findMany({
+			where: { salonId: salon.id },
+		}),
+		prisma.specialistHours.findMany({
+			where: { salonId: salon.id },
+		}),
+		prisma.specialist.findMany({
+			where: { salonId: salon.id },
+			select: { id: true, name: true },
+			orderBy: { name: "asc" },
+		}),
+		prisma.blockedDate.findMany({
+			where: { salonId: salon.id },
+			orderBy: { date: "asc" },
+		}),
+		prisma.blockedSlot.findMany({
+			where: { salonId: salon.id },
+			orderBy: { date: "asc" },
+		}),
+	]);
 
 	const formattedBusinessHours = businessHours.map((bh) => ({
 		...bh,
