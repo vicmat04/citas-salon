@@ -15,14 +15,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-	title: "Citas Salón",
+	title: "Citas Glam | Sistema de Citas y Reservas",
 	description:
 		"Reserva y administra citas de salón desde cualquier dispositivo.",
-	applicationName: "Citas Salón",
+	applicationName: "Citas Glam",
 	manifest: "/manifest.webmanifest",
 	appleWebApp: {
 		capable: true,
-		title: "Citas Salón",
+		title: "Citas Glam",
 		statusBarStyle: "black-translucent",
 	},
 	icons: {

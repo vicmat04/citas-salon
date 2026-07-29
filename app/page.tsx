@@ -9,7 +9,7 @@ export default function PlatformLandingPage() {
       <header className="h-16 border-b flex items-center justify-between px-6 lg:px-12 bg-card">
         <div className="flex items-center gap-2 font-bold text-xl text-primary">
           <Scissors className="h-6 w-6" />
-          <span>Citas Salón</span>
+          <span>Citas Glam</span>
         </div>
         <nav className="flex items-center gap-4">
           <Link href="/login" className="text-sm font-medium hover:underline text-muted-foreground">
@@ -66,7 +66,7 @@ export default function PlatformLandingPage() {
       
       {/* Footer */}
       <footer className="border-t py-8 text-center text-sm text-muted-foreground">
-        <p>&copy; {new Date().getFullYear()} Citas Salón. Todos los derechos reservados.</p>
+        <p>&copy; {new Date().getFullYear()} Citas Glam. Todos los derechos reservados.</p>
       </footer>
     </div>
   )

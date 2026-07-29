@@ -19,12 +19,12 @@ function pngDimensions(path: string) {
 }
 
 describe("PWA metadata and progressive web behavior", () => {
-	it("publishes the Citas Salón manifest with installable icon purposes", async () => {
+	it("publishes the Citas Glam manifest with installable icon purposes", async () => {
 		const { default: manifest } = await import("./manifest");
 
 		expect(manifest()).toMatchObject({
-			name: "Citas Salón",
-			short_name: "Citas Salón",
+			name: "Citas Glam",
+			short_name: "Citas Glam",
 			start_url: "/",
 			display: "standalone",
 			background_color: "#ffffff",
@@ -62,13 +62,13 @@ describe("PWA metadata and progressive web behavior", () => {
 
 		expect(root.props.lang).toBe("es");
 		expect(metadata).toMatchObject({
-			title: "Citas Salón",
+			title: "Citas Glam | Sistema de Citas y Reservas",
 			description: expect.stringContaining("citas"),
-			applicationName: "Citas Salón",
+			applicationName: "Citas Glam",
 			manifest: "/manifest.webmanifest",
 			appleWebApp: {
 				capable: true,
-				title: "Citas Salón",
+				title: "Citas Glam",
 				statusBarStyle: "black-translucent",
 			},
 			icons: {

@@ -1,6 +1,6 @@
 # Catálogo Funcional y Manual de Referencia para Validación
 
-Este documento detalla la totalidad de la funcionalidad interactiva, menús, vistas, formularios y acciones disponibles en la plataforma **Citas Salón** hasta la **Fase 8**. Sirve como guía oficial para pruebas, aseguramiento de calidad (QA) y validación punto por punto. 
+Este documento detalla la totalidad de la funcionalidad interactiva, menús, vistas, formularios y acciones disponibles en la plataforma **Citas Glam** hasta la **Fase 8**. Sirve como guía oficial para pruebas, aseguramiento de calidad (QA) y validación punto por punto.
 
 > **Regla de Mantenimiento:** Cualquier nueva funcionalidad, acción de servidor, botón o flujo interactivo que se incorpore en fases posteriores (por ejemplo, en la Fase 9 de UX/UI App-like) **DEBE** agregarse a este catálogo para mantener la trazabilidad del sistema.
 
@@ -208,7 +208,7 @@ Es la interfaz pública del cliente para agendar citas sin necesidad de estar au
 ## 4. Módulo PWA y UX Móvil (Fase 8)
 
 * **Web App Manifest (`/manifest.webmanifest`):**
-  * Configuración para instalación ("Añadir a pantalla de inicio") con nombre "Citas Salón", `short_name`, colores de marca y modo `standalone`.
+  * Configuración para instalación ("Añadir a pantalla de inicio") con nombre "Citas Glam", `short_name`, colores de marca y modo `standalone`.
 * **Activos de Íconos PWA (`/public/icons/`):**
   * `icon-192.png`, `icon-512.png`, `maskable-512.png` y `apple-touch-icon.png`.
 * **Service Worker (`/public/sw.js`):**

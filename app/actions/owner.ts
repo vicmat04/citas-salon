@@ -103,8 +103,7 @@ export async function updateSpecialistServices(
 
 		if (validServiceCount !== serviceIds.length) {
 			return {
-				error:
-					"Uno o más servicios seleccionados no pertenecen a este salón.",
+				error: "Uno o más servicios seleccionados no pertenecen a este salón.",
 			};
 		}
 

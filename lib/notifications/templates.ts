@@ -37,7 +37,7 @@ export function renderNotificationEmail(input: {
 }): { subject: string; htmlBody: string } {
 	const copy = EVENT_COPY[input.type];
 	const subject = sanitizeSubject(
-		`[Citas Salón] ${copy.subject} — ${input.snapshot.salonName}`,
+		`[Citas Glam] ${copy.subject} — ${input.snapshot.salonName}`,
 	);
 	const greeting =
 		input.roles.length === 1 ? ROLE_GREETING[input.roles[0]] : "Hola,";
@@ -58,7 +58,7 @@ export function renderNotificationEmail(input: {
 
 	return {
 		subject,
-		htmlBody: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px"><h2>${escapeHtml(copy.heading)}</h2><p>${escapeHtml(greeting)}</p><p><strong>Salón:</strong> ${escapeHtml(input.snapshot.salonName)}</p><p><strong>Cliente:</strong> ${escapeHtml(input.snapshot.customerName)}</p><p><strong>Fecha:</strong> ${escapeHtml(input.snapshot.appointmentDate)}</p><p><strong>Horario:</strong> ${escapeHtml(input.snapshot.startTime)}–${escapeHtml(input.snapshot.endTime)}</p><p><strong>Servicios:</strong></p><ul>${services}</ul>${optional}<p><strong>Total:</strong> ${escapeHtml(input.snapshot.total)}</p></div>`,
+		htmlBody: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px"><p><strong>Citas Glam</strong></p><h2>${escapeHtml(copy.heading)}</h2><p>${escapeHtml(greeting)}</p><p><strong>Salón:</strong> ${escapeHtml(input.snapshot.salonName)}</p><p><strong>Cliente:</strong> ${escapeHtml(input.snapshot.customerName)}</p><p><strong>Fecha:</strong> ${escapeHtml(input.snapshot.appointmentDate)}</p><p><strong>Horario:</strong> ${escapeHtml(input.snapshot.startTime)}–${escapeHtml(input.snapshot.endTime)}</p><p><strong>Servicios:</strong></p><ul>${services}</ul>${optional}<p><strong>Total:</strong> ${escapeHtml(input.snapshot.total)}</p><p>— Citas Glam</p></div>`,
 	};
 }
 

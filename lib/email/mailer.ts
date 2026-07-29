@@ -111,7 +111,7 @@ async function sendWithToken(
 	if (!sender.valid) return { accepted: false, errorCode: "oauth_failed" };
 	const subject = options.subject.replace(/[\r\n]+/g, " ").trim();
 	const mimeMessage = [
-		`From: ${sender.normalized}`,
+		`From: Citas Glam <${sender.normalized}>`,
 		`To: ${recipient.normalized}`,
 		`Subject: ${subject}`,
 		"MIME-Version: 1.0",
@@ -204,12 +204,12 @@ export async function sendTrialExpirationEmail({
 
 	const uniqueRecipients = Array.from(new Set(recipients));
 
-	const subject = `[Citas Salón] Notificación de Prueba para el salón "${salonName}"`;
+	const subject = `[Citas Glam] Notificación de Prueba para el salón "${salonName}"`;
 	const htmlBody = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; padding: 24px; background-color: #ffffff;">
-      <h2 style="color: #D4AF37; margin-top: 0;">Citas Salón — Notificación de Suscripción</h2>
+      <h2 style="color: #D4AF37; margin-top: 0;">Citas Glam — Notificación de Suscripción</h2>
       <p>Hola <strong>${ownerName}</strong>,</p>
-      <p>Te escribimos de parte de la plataforma Citas Salón respecto a tu negocio <strong>"${salonName}"</strong>.</p>
+      <p>Te escribimos de parte de la plataforma Citas Glam respecto a tu negocio <strong>"${salonName}"</strong>.</p>
       
       <div style="background-color: #fff8e1; border-left: 4px solid #D4AF37; padding: 16px; margin: 20px 0; border-radius: 4px;">
         <p style="margin: 0; font-size: 16px; font-weight: bold; color: #856404;">
@@ -229,7 +229,7 @@ export async function sendTrialExpirationEmail({
 
       <hr style="border: none; border-top: 1px solid #eeeeee; margin: 30px 0 15px 0;" />
       <p style="font-size: 12px; color: #888888; text-align: center;">
-        Este es un mensaje automático de la plataforma Citas Salón para ${salonName}.
+        Este es un mensaje automático de la plataforma Citas Glam para ${salonName}.
       </p>
     </div>
   `;

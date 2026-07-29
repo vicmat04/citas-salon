@@ -15,7 +15,7 @@ export default function AdminLoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-[400px]">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold text-primary">Citas Salón</CardTitle>
+          <CardTitle className="text-2xl font-bold text-primary">Citas Glam</CardTitle>
           <CardDescription>Panel de administrador</CardDescription>
         </CardHeader>
         <CardContent>

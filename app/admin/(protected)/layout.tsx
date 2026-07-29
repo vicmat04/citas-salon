@@ -67,7 +67,7 @@ export default async function AdminLayout({
 			<aside className="w-64 border-r bg-card hidden md:flex flex-col">
 				<div className="h-16 flex items-center px-6 border-b">
 					<span className="font-bold text-lg text-primary">
-						Citas Salón Admin
+						Citas Glam Admin
 					</span>
 				</div>
 				<NavLinks />
@@ -97,7 +97,7 @@ export default async function AdminLayout({
 							<SheetContent side="left" className="w-64 p-0 flex flex-col">
 								<SheetHeader className="h-16 flex flex-row items-center px-6 border-b">
 									<SheetTitle className="text-primary text-lg">
-										Citas Salón Admin
+										Citas Glam Admin
 									</SheetTitle>
 								</SheetHeader>
 								<NavLinks />

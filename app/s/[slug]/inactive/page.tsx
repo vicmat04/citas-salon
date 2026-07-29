@@ -43,7 +43,7 @@ export default async function InactiveSalonPage({
         </CardHeader>
         <CardContent className="space-y-5">
           <p className="text-sm text-muted-foreground">
-            Si administras este salón y necesitas ayuda, comunícate con la administración de Citas Salón.
+            Si administras este salón y necesitas ayuda, comunícate con la administración de Citas Glam.
           </p>
           <div className="flex flex-col justify-center gap-3 sm:flex-row">
             <Link

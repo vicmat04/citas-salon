@@ -23,7 +23,8 @@ describe("notification templates", () => {
 				roles: ["client"],
 				snapshot,
 			});
-			expect(rendered.subject).toContain("Citas Salón");
+			expect(rendered.subject).toContain("Citas Glam");
+			expect(rendered.htmlBody).toContain("Citas Glam");
 			expect(rendered.htmlBody).toContain("max-width: 600px");
 			expect(rendered.htmlBody).toContain("29 de julio de 2026");
 		},

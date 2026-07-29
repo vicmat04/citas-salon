@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
 	return {
-		name: "Citas Salón",
-		short_name: "Citas Salón",
+		name: "Citas Glam",
+		short_name: "Citas Glam",
 		description:
 			"Reserva y administra citas de salón desde cualquier dispositivo.",
 		start_url: "/",
