@@ -35,8 +35,6 @@ vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 import {
 	addBlockedDate,
 	addBlockedSlot,
-	deleteBlockedDate,
-	deleteBlockedSlot,
 	updateBusinessHours,
 	updateSpecialistHours,
 } from "./schedules";

@@ -52,6 +52,7 @@ describe("owner actions", () => {
 				phone: "",
 				address: "",
 				themeColor: "#112233",
+				ownerEmailNotificationsEnabled: "on",
 			}),
 			"acme",
 		);
@@ -67,8 +68,20 @@ describe("owner actions", () => {
 				address: null,
 				themeColor: "#112233",
 				notificationEmails: null,
+				ownerEmailNotificationsEnabled: true,
 			},
 		});
+	});
+
+	it("persists an absent owner notification checkbox as disabled", async () => {
+		await updateSalonSettings(form({ name: "Acme" }), "acme");
+		expect(mocks.salonUpdate).toHaveBeenCalledWith(
+			expect.objectContaining({
+				data: expect.objectContaining({
+					ownerEmailNotificationsEnabled: false,
+				}),
+			}),
+		);
 	});
 
 	it("creates a specialist with the verified salon ID rather than client tenant input", async () => {

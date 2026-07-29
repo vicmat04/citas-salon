@@ -95,10 +95,36 @@ describe("availability calculation engine", () => {
 		expect(candidates[0].id).toBe("spec-1");
 	});
 
+	it("rejects an explicitly requested specialist missing a selected service", async () => {
+		mocks.specialistFindFirst.mockResolvedValue({
+			id: "spec-1",
+			isActive: true,
+			specialistServices: [{ serviceId: "s1" }],
+		});
+
+		const candidates = await getCandidateSpecialists(
+			"salon-1",
+			["s1", "s2"],
+			"spec-1",
+		);
+
+		expect(candidates).toEqual([]);
+		expect(mocks.specialistFindFirst).toHaveBeenCalledWith({
+			where: { id: "spec-1", salonId: "salon-1", isActive: true },
+			select: {
+				id: true,
+				name: true,
+				email: true,
+				specialistServices: { select: { serviceId: true } },
+			},
+		});
+	});
+
 	it("calculates available start time slots excluding existing appointments", async () => {
 		mocks.specialistFindFirst.mockResolvedValue({
 			id: "spec-1",
 			isActive: true,
+			specialistServices: [{ serviceId: "s1" }],
 		});
 		mocks.serviceFindMany.mockResolvedValue([
 			{
@@ -137,5 +163,40 @@ describe("availability calculation engine", () => {
 		expect(result.slots).toContain("09:00");
 		expect(result.slots).not.toContain("09:30");
 		expect(result.slots).toContain("10:00");
+	});
+
+	it("excludes the appointment being rescheduled from overlap detection", async () => {
+		mocks.specialistFindFirst.mockResolvedValue({
+			id: "spec-1",
+			isActive: true,
+			specialistServices: [{ serviceId: "s1" }],
+		});
+		mocks.serviceFindMany.mockResolvedValue([
+			{
+				id: "s1",
+				name: "Corte",
+				price: 15,
+				durationMinutes: 30,
+				bufferMinutes: 0,
+			},
+		]);
+		mocks.appointmentFindMany.mockResolvedValue([]);
+
+		const result = await getAvailableSlots(
+			"salon-1",
+			new Date(2028, 5, 15),
+			["s1"],
+			"spec-1",
+			"appt-1",
+		);
+
+		expect(result.slots).toContain("09:30");
+		expect(mocks.appointmentFindMany).toHaveBeenCalledWith({
+			where: expect.objectContaining({
+				salonId: "salon-1",
+				specialistId: "spec-1",
+				id: { not: "appt-1" },
+			}),
+		});
 	});
 });

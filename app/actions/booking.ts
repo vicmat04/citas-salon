@@ -1,14 +1,19 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 
+import prisma from "@/lib/db";
+import { buildAppointmentSnapshot } from "@/lib/notifications/appointment-snapshot";
+import { dispatchEvent } from "@/lib/notifications/dispatcher";
+import { validateEmail } from "@/lib/notifications/email-validation";
+import { enqueueAppointmentNotification } from "@/lib/notifications/enqueue";
 import {
 	calculateServicesTotalDuration,
 	getAvailableSlots,
 	getCandidateSpecialists,
 } from "@/lib/salons/availability";
 import { requireOperationalPublicSalon } from "@/lib/salons/lifecycle";
-import prisma from "@/lib/db";
 import { timeStringToDate } from "@/lib/salons/schedules";
 
 function stringValue(formData: FormData, key: string): string {
@@ -42,16 +47,19 @@ export async function createPublicAppointment(
 	slug: string,
 ) {
 	const salon = await requireOperationalPublicSalon(slug);
-
 	const customerName = stringValue(formData, "customerName");
 	if (!customerName || customerName.length < 2) {
 		return { error: "El nombre del cliente es obligatorio" };
 	}
 
-	const customerEmail = stringValue(formData, "customerEmail");
-	if (!customerEmail || !customerEmail.includes("@")) {
+	const suppliedEmail = stringValue(formData, "customerEmail");
+	const emailValidation = suppliedEmail ? validateEmail(suppliedEmail) : null;
+	if (emailValidation && !emailValidation.valid) {
 		return { error: "Por favor ingresa un correo electrónico válido" };
 	}
+	const customerEmail = emailValidation?.valid
+		? emailValidation.normalized
+		: null;
 
 	const customerPhone = stringValue(formData, "customerPhone");
 	if (!customerPhone || customerPhone.length < 7) {
@@ -65,22 +73,18 @@ export async function createPublicAppointment(
 	if (!dateStr || !startTimeStr) {
 		return { error: "La fecha y hora de la cita son obligatorias" };
 	}
-
 	const date = new Date(dateStr);
 	if (Number.isNaN(date.getTime())) return { error: "Fecha no válida" };
 
-	const serviceIdsRaw = stringValue(formData, "serviceIds");
-	const serviceIds = serviceIdsRaw
-		? serviceIdsRaw.split(",").filter(Boolean)
-		: [];
+	const serviceIds = stringValue(formData, "serviceIds")
+		.split(",")
+		.filter(Boolean);
 	if (serviceIds.length === 0) {
 		return { error: "Debes seleccionar al menos un servicio" };
 	}
-
 	const requestedSpecialistId = stringValue(formData, "specialistId") || "any";
 	const customerNotes = stringValue(formData, "customerNotes") || null;
 
-	// Re-verify availability for slot
 	const availability = await getAvailableSlots(
 		salon.id,
 		date,
@@ -94,7 +98,6 @@ export async function createPublicAppointment(
 		};
 	}
 
-	// Resolve assigned specialist
 	const candidates = await getCandidateSpecialists(
 		salon.id,
 		serviceIds,
@@ -107,75 +110,119 @@ export async function createPublicAppointment(
 		};
 	}
 
-	// Compute total duration & price
 	const { totalDurationMinutes, totalPrice, services } =
 		await calculateServicesTotalDuration(serviceIds);
-
-	// Construct startTime Date objects
 	const startTimeDate = timeStringToDate(startTimeStr);
 	const [startHours, startMinutes] = startTimeStr.split(":").map(Number);
 	const totalEndMinutes = startHours * 60 + startMinutes + totalDurationMinutes;
-	const endHours = Math.floor(totalEndMinutes / 60);
-	const endMinutes = totalEndMinutes % 60;
-	const endTimeStr = `${String(endHours).padStart(2, "0")}:${String(endMinutes).padStart(2, "0")}`;
-	const endTimeDate = timeStringToDate(endTimeStr);
+	const endTimeDate = timeStringToDate(
+		`${String(Math.floor(totalEndMinutes / 60)).padStart(2, "0")}:${String(totalEndMinutes % 60).padStart(2, "0")}`,
+	);
 
 	try {
-		// 1. Find or create Customer record for salon
-		let customer = await prisma.customer.findFirst({
-			where: {
-				salonId: salon.id,
-				OR: [{ email: customerEmail }, { phone: customerPhone }],
-			},
-		});
-
-		if (customer) {
-			customer = await prisma.customer.update({
-				where: { id: customer.id },
-				data: {
-					fullName: customerName,
-					phone: customerPhone,
-					email: customerEmail,
+		const committed = await prisma.$transaction(async (tx) => {
+			const notificationSalon = await tx.salon.findUnique({
+				where: { id: salon.id },
+				select: {
+					name: true,
+					timezone: true,
+					ownerEmailNotificationsEnabled: true,
+					owner: { select: { email: true } },
 				},
 			});
-		} else {
-			customer = await prisma.customer.create({
+			if (!notificationSalon) throw new Error("Salon not found");
+
+			let customer = await tx.customer.findFirst({
+				where: {
+					salonId: salon.id,
+					OR: [
+						{ phone: customerPhone },
+						...(customerEmail ? [{ email: customerEmail }] : []),
+					],
+				},
+			});
+			if (customer) {
+				customer = await tx.customer.update({
+					where: { id: customer.id },
+					data: {
+						fullName: customerName,
+						phone: customerPhone,
+						...(customerEmail ? { email: customerEmail } : {}),
+					},
+				});
+			} else {
+				customer = await tx.customer.create({
+					data: {
+						salonId: salon.id,
+						fullName: customerName,
+						email: customerEmail,
+						phone: customerPhone,
+					},
+				});
+			}
+
+			const appointment = await tx.appointment.create({
 				data: {
 					salonId: salon.id,
-					fullName: customerName,
-					email: customerEmail,
-					phone: customerPhone,
+					customerId: customer.id,
+					specialistId: assignedSpecialist.id,
+					status: "confirmed",
+					source: "public_form",
+					appointmentDate: date,
+					startTime: startTimeDate,
+					endTime: endTimeDate,
+					totalPriceSnapshot: totalPrice,
+					totalDurationMinutes,
+					customerNotes,
+					appointmentServices: {
+						create: services.map((service) => ({
+							serviceId: service.id,
+							priceSnapshot: service.price,
+							durationSnapshot: service.durationMinutes,
+						})),
+					},
 				},
 			});
-		}
-
-		// 2. Create Appointment in status 'confirmed'
-		const appointment = await prisma.appointment.create({
-			data: {
+			const event = await enqueueAppointmentNotification(tx, {
 				salonId: salon.id,
-				customerId: customer.id,
-				specialistId: assignedSpecialist.id,
-				status: "confirmed",
-				source: "public_form",
-				appointmentDate: date,
-				startTime: startTimeDate,
-				endTime: endTimeDate,
-				totalPriceSnapshot: totalPrice,
-				totalDurationMinutes,
-				customerNotes,
-				appointmentServices: {
-					create: services.map((s) => ({
-						serviceId: s.id,
-						priceSnapshot: s.price,
-						durationSnapshot: s.durationMinutes,
+				appointmentId: appointment.id,
+				type: "created",
+				payload: buildAppointmentSnapshot({
+					salonName: notificationSalon.name,
+					timezone: notificationSalon.timezone,
+					customerName,
+					appointmentDate: date,
+					startTime: startTimeDate,
+					endTime: endTimeDate,
+					services: services.map((service) => ({
+						name: service.name,
+						price: service.price,
 					})),
-				},
-			},
+					specialistName: assignedSpecialist.name,
+					total: totalPrice,
+				}),
+				clientEmail: customer.email,
+				ownerEmail: notificationSalon.owner.email,
+				ownerEmailNotificationsEnabled:
+					notificationSalon.ownerEmailNotificationsEnabled,
+				specialistEmail: assignedSpecialist.email,
+				hasSpecialist: true,
+			});
+			return { appointmentId: appointment.id, eventId: event.id };
 		});
 
+		after(() =>
+			dispatchEvent(committed.eventId)
+				.then(() => undefined)
+				.catch(() => undefined),
+		);
 		revalidatePath(`/book/${slug}`);
 		revalidatePath(`/${slug}`);
-		return { success: true, appointmentId: appointment.id };
+		return {
+			success: true,
+			appointmentId: committed.appointmentId,
+			notification: { state: "queued" as const },
+		};
 	} catch {
 		return {
 			error:

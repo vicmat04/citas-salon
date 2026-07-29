@@ -43,8 +43,9 @@ model Salon {
   status             String   @default("pending") // 'pending', 'trial', 'active', 'suspended', 'cancelled'
   bookingRangeDays   Int      @default(15) @map("booking_range_days")
   minAdvanceHours    Int      @default(1) @map("min_advance_hours")
-  notificationEmails String?  @map("notification_emails")
-  planId             String?  @map("plan_id")
+  notificationEmails             String? @map("notification_emails")
+  ownerEmailNotificationsEnabled Boolean @default(true) @map("owner_email_notifications_enabled")
+  planId                          String? @map("plan_id")
   adminNotes         String?  @map("admin_notes")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
@@ -64,7 +65,8 @@ model Salon {
   appointments  Appointment[]
   subscriptions Subscription[]
   accessTokens  AccessToken[]
-  auditLogs     AuditLog[]
+  auditLogs AuditLog[]
+  notificationEvents AppointmentNotificationEvent[]
 
   @@index([status])
   @@index([ownerId])
@@ -262,6 +264,8 @@ model Appointment {
   isSpecialEvent       Boolean  @default(false) @map("is_special_event")
   totalPriceSnapshot   Decimal  @default(0) @db.Decimal(10, 2) @map("total_price_snapshot")
   totalDurationMinutes Int      @default(0) @map("total_duration_minutes")
+  notificationRevision Int      @default(0) @map("notification_revision")
+  scheduleRevision     Int      @default(0) @map("schedule_revision")
   createdByUserId      String?  @map("created_by_user_id")
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @default(now()) @updatedAt @map("updated_at")
@@ -271,12 +275,60 @@ model Appointment {
   specialist          Specialist?          @relation(fields: [specialistId], references: [id], onDelete: SetNull)
   createdByUser       User?                @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
   appointmentServices AppointmentService[]
+  notificationEvents   AppointmentNotificationEvent[]
 
+  @@unique([id, salonId])
   @@index([salonId, appointmentDate])
   @@index([specialistId, appointmentDate])
   @@index([salonId, status])
   @@index([customerId])
   @@map("appointments")
+}
+
+model AppointmentNotificationEvent {
+  id               String    @id @default(uuid())
+  salonId          String    @map("salon_id")
+  appointmentId    String    @map("appointment_id")
+  type             String
+  eventKey         String    @unique @map("event_key")
+  scheduleRevision Int?      @map("schedule_revision")
+  payload          Json
+  status           String    @default("pending")
+  availableAt      DateTime  @default(now()) @map("available_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  completedAt      DateTime? @map("completed_at")
+
+  salon       Salon                             @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  appointment Appointment                       @relation(fields: [appointmentId, salonId], references: [id, salonId], onDelete: Cascade)
+  deliveries AppointmentNotificationDelivery[]
+
+  @@index([status, availableAt])
+  @@index([salonId, createdAt])
+  @@index([appointmentId, createdAt])
+  @@map("appointment_notification_events")
+}
+
+model AppointmentNotificationDelivery {
+  id              String    @id @default(uuid())
+  eventId         String    @map("event_id")
+  roles           String[]
+  recipientEmail  String?   @map("recipient_email")
+  recipientMasked String?   @map("recipient_masked")
+  recipientKey    String    @map("recipient_key")
+  status          String    @default("pending")
+  resultCode      String?   @map("result_code")
+  attemptCount    Int       @default(0) @map("attempt_count")
+  startedAt       DateTime? @map("started_at")
+  sentAt          DateTime? @map("sent_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  event AppointmentNotificationEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, recipientKey])
+  @@index([status, createdAt])
+  @@index([eventId])
+  @@map("appointment_notification_deliveries")
 }
 
 model AppointmentService {

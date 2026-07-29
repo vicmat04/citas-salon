@@ -59,7 +59,7 @@ export default async function SalonLayout({
 	];
 
 	return (
-		<div className="flex min-h-screen bg-background">
+		<div className="flex min-h-dvh bg-background">
 			<aside className="hidden w-64 flex-col border-r bg-card md:flex">
 				<div className="flex h-16 items-center border-b px-6">
 					<span className="text-lg font-bold text-primary">{salon.name}</span>
@@ -96,10 +96,12 @@ export default async function SalonLayout({
 				</div>
 			</aside>
 
-			<main className="flex flex-1 flex-col pb-16 md:pb-0">
-				<header className="flex h-16 items-center justify-between border-b bg-card px-6">
-					<h1 className="text-lg font-semibold md:hidden">{salon.name}</h1>
-					<div className="ml-auto flex items-center gap-4">
+			<main className="flex min-w-0 flex-1 flex-col">
+				<header className="flex h-16 items-center justify-between gap-3 border-b bg-card px-4 sm:px-6">
+					<h1 className="min-w-0 truncate text-lg font-semibold md:hidden">
+						{salon.name}
+					</h1>
+					<div className="ml-auto flex shrink-0 items-center gap-3 sm:gap-4">
 						<Link
 							href="/my-salons"
 							className="text-sm font-medium hover:underline"
@@ -124,15 +126,20 @@ export default async function SalonLayout({
 						remainingDays={remainingTrialDays}
 					/>
 				)}
-				<div className="flex-1 overflow-auto p-6">{children}</div>
+				<div className="protected-content flex-1 overflow-y-auto">
+					{children}
+				</div>
 			</main>
 
-			<nav className="fixed bottom-0 left-0 right-0 z-50 flex h-16 items-center justify-around border-t bg-card md:hidden">
+			<nav
+				aria-label="Navegación principal"
+				className="mobile-bottom-nav fixed inset-x-0 bottom-0 z-50 flex items-center justify-around border-t bg-card/95 backdrop-blur md:hidden"
+			>
 				{navigation.slice(0, 3).map(({ href, label, icon: Icon }) => (
 					<Link
 						key={href}
 						href={href}
-						className="flex h-full w-full flex-col items-center justify-center text-muted-foreground hover:text-primary"
+						className="flex min-h-16 w-full flex-col items-center justify-center text-muted-foreground hover:text-primary"
 					>
 						<Icon className="h-5 w-5" />
 						<span className="mt-1 text-[10px]">{label}</span>
@@ -140,7 +147,7 @@ export default async function SalonLayout({
 				))}
 				<Link
 					href={`/s/${slug}/settings`}
-					className="flex h-full w-full flex-col items-center justify-center text-muted-foreground hover:text-primary"
+					className="flex min-h-16 w-full flex-col items-center justify-center text-muted-foreground hover:text-primary"
 				>
 					<Settings className="h-5 w-5" />
 					<span className="mt-1 text-[10px]">Ajustes</span>

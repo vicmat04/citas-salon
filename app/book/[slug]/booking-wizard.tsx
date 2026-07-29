@@ -177,8 +177,8 @@ export function BookingWizard({
 	}
 
 	return (
-		<div className="min-h-screen bg-muted/30 py-8 px-4 sm:px-6">
-			<div className="max-w-2xl mx-auto space-y-6">
+		<div className="min-h-dvh bg-muted/30 px-3 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-8">
+			<div className="mx-auto max-w-2xl space-y-6">
 				<div className="text-center mb-6">
 					<h1 className="text-3xl font-extrabold capitalize">{salonName}</h1>
 					<p className="text-muted-foreground mt-1">
@@ -203,8 +203,25 @@ export function BookingWizard({
 					))}
 				</div>
 
+				{step > 1 && (
+					<div
+						aria-label="Resumen de la reserva"
+						className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card p-3 text-sm"
+					>
+						<span className="min-w-0 font-medium">
+							{selectedServices.map((service) => service.name).join(", ")}
+						</span>
+						<span className="shrink-0 font-bold text-primary">
+							{totalDuration} min · ${totalPrice.toFixed(2)}
+						</span>
+					</div>
+				)}
+
 				{errorMessage && (
-					<div className="rounded-md bg-destructive/15 p-4 text-sm text-destructive font-medium">
+					<div
+						role="alert"
+						className="rounded-md bg-destructive/15 p-4 text-sm font-medium text-destructive"
+					>
 						{errorMessage}
 					</div>
 				)}
@@ -230,10 +247,12 @@ export function BookingWizard({
 								services.map((srv) => {
 									const isSelected = selectedServiceIds.includes(srv.id);
 									return (
-										<div
+										<button
+											type="button"
 											key={srv.id}
+											aria-pressed={isSelected}
 											onClick={() => toggleService(srv.id)}
-											className={`flex items-center justify-between p-4 border rounded-lg cursor-pointer transition-all ${
+											className={`flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border p-4 text-left transition-all ${
 												isSelected
 													? "border-primary bg-primary/5 shadow-sm"
 													: "hover:border-primary/50"
@@ -250,15 +269,15 @@ export function BookingWizard({
 													{srv.durationMinutes} min
 												</p>
 											</div>
-											<div className="font-bold text-lg text-primary">
+											<div className="shrink-0 text-lg font-bold text-primary">
 												${srv.price.toFixed(2)}
 											</div>
-										</div>
+										</button>
 									);
 								})
 							)}
 						</CardContent>
-						<CardFooter className="flex justify-between border-t pt-4">
+						<CardFooter className="flex flex-wrap justify-between gap-2 border-t pt-4">
 							<div className="text-sm">
 								<p className="font-medium text-muted-foreground">
 									{selectedServiceIds.length}{" "}
@@ -272,7 +291,7 @@ export function BookingWizard({
 							<Button
 								disabled={selectedServiceIds.length === 0}
 								onClick={() => setStep(2)}
-								className="gap-2 font-bold"
+								className="min-h-11 gap-2 font-bold"
 							>
 								Continuar <ChevronRight className="h-4 w-4" />
 							</Button>
@@ -294,9 +313,11 @@ export function BookingWizard({
 							</CardDescription>
 						</CardHeader>
 						<CardContent className="space-y-3">
-							<div
+							<button
+								type="button"
+								aria-pressed={selectedSpecialistId === "any"}
 								onClick={() => setSelectedSpecialistId("any")}
-								className={`p-4 border rounded-lg cursor-pointer transition-all ${
+								className={`min-h-11 w-full rounded-lg border p-4 text-left transition-all ${
 									selectedSpecialistId === "any"
 										? "border-primary bg-primary/5 shadow-sm"
 										: "hover:border-primary/50"
@@ -315,15 +336,17 @@ export function BookingWizard({
 										</p>
 									</div>
 								</div>
-							</div>
+							</button>
 
 							{specialists.map((spec) => {
 								const isSelected = selectedSpecialistId === spec.id;
 								return (
-									<div
+									<button
+										type="button"
 										key={spec.id}
+										aria-pressed={isSelected}
 										onClick={() => setSelectedSpecialistId(spec.id)}
-										className={`p-4 border rounded-lg cursor-pointer transition-all ${
+										className={`min-h-11 w-full rounded-lg border p-4 text-left transition-all ${
 											isSelected
 												? "border-primary bg-primary/5 shadow-sm"
 												: "hover:border-primary/50"
@@ -344,19 +367,22 @@ export function BookingWizard({
 												)}
 											</div>
 										</div>
-									</div>
+									</button>
 								);
 							})}
 						</CardContent>
-						<CardFooter className="flex justify-between border-t pt-4">
+						<CardFooter className="flex flex-wrap justify-between gap-2 border-t pt-4">
 							<Button
 								variant="outline"
 								onClick={() => setStep(1)}
-								className="gap-2"
+								className="min-h-11 gap-2"
 							>
 								<ChevronLeft className="h-4 w-4" /> Volver
 							</Button>
-							<Button onClick={() => setStep(3)} className="gap-2 font-bold">
+							<Button
+								onClick={() => setStep(3)}
+								className="min-h-11 gap-2 font-bold"
+							>
 								Continuar <ChevronRight className="h-4 w-4" />
 							</Button>
 						</CardFooter>
@@ -387,7 +413,7 @@ export function BookingWizard({
 									min={dateMinStr}
 									max={dateMaxStr}
 									onChange={(e) => setSelectedDate(e.target.value)}
-									className="mt-1"
+									className="mt-1 min-h-11"
 									required
 								/>
 							</div>
@@ -409,7 +435,7 @@ export function BookingWizard({
 										seleccionando otro día o profesional.
 									</p>
 								) : (
-									<div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-56 overflow-y-auto p-1 border rounded-md">
+									<div className="grid max-h-56 grid-cols-2 gap-2 overflow-y-auto rounded-md border p-1 min-[360px]:grid-cols-3 sm:grid-cols-4">
 										{availableSlots.map((time) => {
 											const isSelected = selectedTimeSlot === time;
 											return (
@@ -417,7 +443,7 @@ export function BookingWizard({
 													type="button"
 													key={time}
 													onClick={() => setSelectedTimeSlot(time)}
-													className={`py-2 px-3 text-sm font-semibold rounded-md border text-center transition-all ${
+													className={`min-h-11 rounded-md border px-3 py-2 text-center text-sm font-semibold transition-all ${
 														isSelected
 															? "bg-primary text-primary-foreground border-primary shadow"
 															: "bg-background hover:bg-accent text-foreground"
@@ -431,18 +457,18 @@ export function BookingWizard({
 								)}
 							</div>
 						</CardContent>
-						<CardFooter className="flex justify-between border-t pt-4">
+						<CardFooter className="flex flex-wrap justify-between gap-2 border-t pt-4">
 							<Button
 								variant="outline"
 								onClick={() => setStep(2)}
-								className="gap-2"
+								className="min-h-11 gap-2"
 							>
 								<ChevronLeft className="h-4 w-4" /> Volver
 							</Button>
 							<Button
 								disabled={!selectedTimeSlot}
 								onClick={() => setStep(4)}
-								className="gap-2 font-bold"
+								className="min-h-11 gap-2 font-bold"
 							>
 								Continuar <ChevronRight className="h-4 w-4" />
 							</Button>
@@ -485,6 +511,7 @@ export function BookingWizard({
 								<div>
 									<Label htmlFor="cust-name">Nombre Completo *</Label>
 									<Input
+										className="min-h-11"
 										id="cust-name"
 										value={customerName}
 										onChange={(e) => setCustomerName(e.target.value)}
@@ -494,20 +521,23 @@ export function BookingWizard({
 								</div>
 
 								<div>
-									<Label htmlFor="cust-email">Correo Electrónico *</Label>
+									<Label htmlFor="cust-email">
+										Correo Electrónico (opcional)
+									</Label>
 									<Input
+										className="min-h-11"
 										id="cust-email"
 										type="email"
 										value={customerEmail}
 										onChange={(e) => setCustomerEmail(e.target.value)}
 										placeholder="maria@ejemplo.com"
-										required
 									/>
 								</div>
 
 								<div>
 									<Label htmlFor="cust-phone">WhatsApp / Teléfono *</Label>
 									<Input
+										className="min-h-11"
 										id="cust-phone"
 										type="tel"
 										value={customerPhone}
@@ -522,6 +552,7 @@ export function BookingWizard({
 										Notas adicionales (opcional)
 									</Label>
 									<Input
+										className="min-h-11"
 										id="cust-notes"
 										value={customerNotes}
 										onChange={(e) => setCustomerNotes(e.target.value)}
@@ -529,19 +560,19 @@ export function BookingWizard({
 									/>
 								</div>
 							</CardContent>
-							<CardFooter className="flex justify-between border-t pt-4">
+							<CardFooter className="flex flex-wrap justify-between gap-2 border-t pt-4 max-[359px]:flex-col">
 								<Button
 									type="button"
 									variant="outline"
 									onClick={() => setStep(3)}
-									className="gap-2"
+									className="min-h-11 gap-2"
 								>
 									<ChevronLeft className="h-4 w-4" /> Volver
 								</Button>
 								<Button
 									type="submit"
 									disabled={isSubmitting}
-									className="gap-2 font-bold"
+									className="min-h-11 gap-2 font-bold"
 								>
 									{isSubmitting ? (
 										<Loader2 className="h-4 w-4 animate-spin" />

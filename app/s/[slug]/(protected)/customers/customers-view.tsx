@@ -3,17 +3,11 @@
 import { useState } from "react";
 import {
 	Search,
-	User,
 	Phone,
 	Mail,
 	Cake,
-	DollarSign,
-	Calendar,
 	MessageSquare,
-	Edit,
 	Trash2,
-	CheckCircle,
-	AlertCircle,
 	FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,10 +25,6 @@ import {
 } from "@/components/ui/dialog";
 import { CreateCustomerDialog } from "./create-customer-dialog";
 import { deleteCustomer, updateCustomer } from "@/app/actions/customers";
-
-interface AppointmentService {
-	service: { name: string } | null;
-}
 
 interface CustomerAppointment {
 	id: string;
@@ -168,13 +158,14 @@ export function CustomersView({
 	});
 
 	return (
-		<div className="space-y-6">
+		<div className="min-w-0 space-y-6">
 			{errorMessage && (
-				<div className="rounded-md bg-destructive/15 p-4 text-sm text-destructive font-medium flex justify-between items-center">
-					<span>{errorMessage}</span>
+				<div className="flex items-center justify-between gap-3 rounded-md bg-destructive/15 p-4 text-sm font-medium text-destructive">
+					<span className="min-w-0">{errorMessage}</span>
 					<button
+						type="button"
 						onClick={() => setErrorMessage(null)}
-						className="text-xs underline"
+						className="min-h-11 shrink-0 px-2 text-xs underline"
 					>
 						Cerrar
 					</button>
@@ -191,13 +182,15 @@ export function CustomersView({
 						clientes.
 					</p>
 				</div>
-				<CreateCustomerDialog
-					slug={slug}
-					onSelectExisting={(id) => {
-						const found = customers.find((c) => c.id === id);
-						if (found) openDetailDialog(found);
-					}}
-				/>
+				<div className="[&_[data-slot=button]]:min-h-11">
+					<CreateCustomerDialog
+						slug={slug}
+						onSelectExisting={(id) => {
+							const found = customers.find((c) => c.id === id);
+							if (found) openDetailDialog(found);
+						}}
+					/>
+				</div>
 			</div>
 
 			{/* Search Bar & Tabs */}
@@ -208,7 +201,7 @@ export function CustomersView({
 						placeholder="Buscar por nombre, teléfono o correo electrónico..."
 						value={searchTerm}
 						onChange={(e) => setSearchTerm(e.target.value)}
-						className="pl-9"
+						className="min-h-11 pl-9"
 					/>
 				</div>
 
@@ -218,21 +211,30 @@ export function CustomersView({
 						setSelectedTab(v as "all" | "birthdays" | "frequent")
 					}
 				>
-					<TabsList className="grid w-full grid-cols-3 max-w-md">
-						<TabsTrigger value="all" className="font-bold">
+					<TabsList className="grid h-auto min-h-11 w-full max-w-md grid-cols-3">
+						<TabsTrigger
+							value="all"
+							className="min-h-11 whitespace-normal text-xs font-bold"
+						>
 							Todos ({customers.length})
 						</TabsTrigger>
-						<TabsTrigger value="birthdays" className="font-bold">
+						<TabsTrigger
+							value="birthdays"
+							className="min-h-11 whitespace-normal text-xs font-bold"
+						>
 							Cumpleaños Mes
 						</TabsTrigger>
-						<TabsTrigger value="frequent" className="font-bold">
+						<TabsTrigger
+							value="frequent"
+							className="min-h-11 whitespace-normal text-xs font-bold"
+						>
 							Frecuentes (3+)
 						</TabsTrigger>
 					</TabsList>
 
 					<TabsContent value={selectedTab} className="mt-6">
 						{filteredCustomers.length === 0 ? (
-							<Card className="p-12 text-center text-muted-foreground">
+							<Card className="p-8 text-center text-muted-foreground sm:p-12">
 								No se encontraron clientes para este filtro.
 							</Card>
 						) : (
@@ -253,20 +255,35 @@ export function CustomersView({
 										>
 											<CardContent className="p-5 space-y-4">
 												<div className="flex items-start justify-between">
-													<div>
-														<h3
-															className="font-bold text-lg cursor-pointer hover:underline"
+													<div className="min-w-0">
+														<button
+															type="button"
+															className="min-h-11 max-w-full text-left text-lg font-bold hover:underline"
 															onClick={() => openDetailDialog(cust)}
 														>
 															{cust.fullName}
-														</h3>
-														<p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-															<Phone className="h-3 w-3" /> {cust.phone}
-														</p>
+														</button>
+														<button
+															type="button"
+															onClick={() => {
+																window.location.href = `tel:${cust.phone}`;
+															}}
+															className="flex min-h-11 max-w-full items-center gap-1 break-all text-left text-xs text-muted-foreground"
+														>
+															<Phone className="h-3 w-3 shrink-0" />{" "}
+															{cust.phone}
+														</button>
 														{cust.email && (
-															<p className="text-xs text-muted-foreground flex items-center gap-1">
-																<Mail className="h-3 w-3" /> {cust.email}
-															</p>
+															<button
+																type="button"
+																onClick={() => {
+																	window.location.href = `mailto:${cust.email}`;
+																}}
+																className="flex min-h-11 max-w-full items-center gap-1 break-all text-left text-xs text-muted-foreground"
+															>
+																<Mail className="h-3 w-3 shrink-0" />{" "}
+																{cust.email}
+															</button>
 														)}
 													</div>
 													{cust.birthday && (
@@ -314,34 +331,44 @@ export function CustomersView({
 													</p>
 												)}
 
-												<div className="flex items-center justify-between pt-1">
+												<div className="flex flex-wrap items-center justify-between gap-2 pt-1">
 													<Button
 														size="sm"
 														variant="outline"
-														className="h-8 text-xs gap-1"
+														className="min-h-11 gap-1 text-xs"
 														onClick={() => openDetailDialog(cust)}
 													>
 														<FileText className="h-3.5 w-3.5" /> Ver Ficha
 													</Button>
 
 													{selectedTab === "birthdays" ? (
-														<a
-															href={waBirthdayUrl}
-															target="_blank"
-															rel="noopener noreferrer"
-															className="h-8 px-3 text-xs gap-1 rounded-md border flex items-center justify-center font-bold bg-amber-500/10 text-amber-900 border-amber-500/40 hover:bg-amber-500/20 transition-colors"
+														<button
+															type="button"
+															onClick={() =>
+																window.open(
+																	waBirthdayUrl,
+																	"_blank",
+																	"noopener,noreferrer",
+																)
+															}
+															className="flex min-h-11 items-center justify-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 text-xs font-bold text-amber-900 transition-colors hover:bg-amber-500/20"
 														>
 															<Cake className="h-3.5 w-3.5" /> Felicitar por WA
-														</a>
+														</button>
 													) : (
-														<a
-															href={waUrl}
-															target="_blank"
-															rel="noopener noreferrer"
-															className="h-8 px-3 text-xs gap-1 rounded-md border flex items-center justify-center font-medium bg-[#25D366]/10 text-[#25D366] border-[#25D366]/30 hover:bg-[#25D366]/20 transition-colors"
+														<button
+															type="button"
+															onClick={() =>
+																window.open(
+																	waUrl,
+																	"_blank",
+																	"noopener,noreferrer",
+																)
+															}
+															className="flex min-h-11 items-center justify-center gap-1 rounded-md border border-[#25D366]/30 bg-[#25D366]/10 px-3 text-xs font-medium text-[#25D366] transition-colors hover:bg-[#25D366]/20"
 														>
 															<MessageSquare className="h-3.5 w-3.5" /> WhatsApp
-														</a>
+														</button>
 													)}
 												</div>
 											</CardContent>
@@ -356,7 +383,7 @@ export function CustomersView({
 
 			{/* Customer Detail & History Modal */}
 			<Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-				<DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+				<DialogContent className="max-h-[90dvh] max-w-2xl overflow-y-auto [&_input]:min-h-11">
 					<DialogHeader>
 						<DialogTitle>Ficha e Historial del Cliente</DialogTitle>
 					</DialogHeader>
@@ -364,7 +391,7 @@ export function CustomersView({
 					{selectedCustomer && (
 						<div className="space-y-6">
 							{/* Customer Stats Header */}
-							<div className="grid grid-cols-3 gap-3 border p-4 rounded-md bg-muted/20 text-center">
+							<div className="grid grid-cols-1 gap-3 rounded-md border bg-muted/20 p-4 text-center min-[360px]:grid-cols-3">
 								<div>
 									<p className="text-xl font-bold text-primary">
 										${selectedCustomer.totalSpent.toFixed(2)}
@@ -480,7 +507,7 @@ export function CustomersView({
 										selectedCustomer.appointments.map((appt) => (
 											<div
 												key={appt.id}
-												className="flex items-center justify-between p-3 border rounded-md text-xs"
+												className="flex flex-col items-start justify-between gap-2 rounded-md border p-3 text-xs min-[390px]:flex-row min-[390px]:items-center"
 											>
 												<div>
 													<p className="font-bold">
@@ -490,7 +517,7 @@ export function CustomersView({
 														{appt.servicesList} • Prof: {appt.specialistName}
 													</p>
 												</div>
-												<div className="text-right space-y-1">
+												<div className="space-y-1 min-[390px]:text-right">
 													<p className="font-bold text-primary">
 														${appt.totalPriceSnapshot.toFixed(2)}
 													</p>
@@ -512,11 +539,11 @@ export function CustomersView({
 								</div>
 							</div>
 
-							<DialogFooter className="border-t pt-4 flex justify-between items-center">
+							<DialogFooter className="flex flex-col-reverse items-stretch justify-between gap-2 border-t pt-4 min-[390px]:flex-row min-[390px]:items-center">
 								<Button
 									variant="ghost"
 									size="sm"
-									className="text-destructive hover:text-destructive gap-1"
+									className="min-h-11 gap-1 text-destructive hover:text-destructive"
 									onClick={() => handleDeleteCustomer(selectedCustomer.id)}
 									disabled={isPending}
 								>
@@ -525,6 +552,7 @@ export function CustomersView({
 								<Button
 									variant="outline"
 									size="sm"
+									className="min-h-11"
 									onClick={() => setIsDetailDialogOpen(false)}
 								>
 									Cerrar

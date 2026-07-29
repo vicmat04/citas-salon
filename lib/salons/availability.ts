@@ -15,6 +15,7 @@ export interface AvailableSlotResult {
  */
 export async function calculateServicesTotalDuration(
 	serviceIds: string[],
+	salonId?: string,
 ): Promise<{
 	totalDurationMinutes: number;
 	totalPrice: number;
@@ -30,7 +31,7 @@ export async function calculateServicesTotalDuration(
 	}
 
 	const dbServices = await prisma.service.findMany({
-		where: { id: { in: serviceIds } },
+		where: { id: { in: serviceIds }, ...(salonId ? { salonId } : {}) },
 	});
 
 	let totalDurationMinutes = 0;
@@ -67,12 +68,24 @@ export async function getCandidateSpecialists(
 	salonId: string,
 	serviceIds: string[],
 	requestedSpecialistId?: string,
-) {
+): Promise<Array<{ id: string; name: string; email: string | null }>> {
 	if (requestedSpecialistId && requestedSpecialistId !== "any") {
 		const spec = await prisma.specialist.findFirst({
 			where: { id: requestedSpecialistId, salonId, isActive: true },
+			select: {
+				id: true,
+				name: true,
+				email: true,
+				specialistServices: { select: { serviceId: true } },
+			},
 		});
-		return spec ? [spec] : [];
+		if (!spec) return [];
+		const offeredIds = new Set(
+			spec.specialistServices.map((item) => item.serviceId),
+		);
+		return serviceIds.every((id) => offeredIds.has(id))
+			? [{ id: spec.id, name: spec.name, email: spec.email }]
+			: [];
 	}
 
 	const activeSpecialists = await prisma.specialist.findMany({
@@ -82,15 +95,20 @@ export async function getCandidateSpecialists(
 		},
 	});
 
-	if (serviceIds.length === 0) return activeSpecialists;
-
-	// Filter specialists that offer all requested services
-	return activeSpecialists.filter((spec) => {
-		const offeredIds = new Set(
-			spec.specialistServices.map((ss) => ss.serviceId),
-		);
-		return serviceIds.every((id) => offeredIds.has(id));
-	});
+	const eligible =
+		serviceIds.length === 0
+			? activeSpecialists
+			: activeSpecialists.filter((spec) => {
+					const offeredIds = new Set(
+						spec.specialistServices.map((ss) => ss.serviceId),
+					);
+					return serviceIds.every((id) => offeredIds.has(id));
+				});
+	return eligible.map((spec) => ({
+		id: spec.id,
+		name: spec.name,
+		email: spec.email,
+	}));
 }
 
 /**
@@ -101,9 +119,12 @@ export async function getAvailableSlots(
 	date: Date,
 	serviceIds: string[],
 	requestedSpecialistId?: string,
+	excludeAppointmentId?: string,
 ): Promise<AvailableSlotResult> {
-	const { totalDurationMinutes } =
-		await calculateServicesTotalDuration(serviceIds);
+	const { totalDurationMinutes } = await calculateServicesTotalDuration(
+		serviceIds,
+		salonId,
+	);
 	if (totalDurationMinutes === 0) return { slots: [] };
 
 	const candidates = await getCandidateSpecialists(
@@ -170,6 +191,7 @@ export async function getAvailableSlots(
 			where: {
 				salonId,
 				specialistId: spec.id,
+				...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
 				status: { not: "cancelled" },
 				startTime: {
 					gte: new Date(

@@ -91,7 +91,7 @@ export default async function PublicConfirmationPage({
 	const whatsappUrl = `https://wa.me/${whatsappPhone}?text=${whatsappMessage}`;
 
 	return (
-		<div className="min-h-screen bg-muted/30 py-12 px-4 sm:px-6 flex items-center justify-center">
+		<div className="flex min-h-dvh items-center justify-center bg-muted/30 px-3 py-8 pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-12">
 			<Card className="max-w-md w-full border-primary/20 shadow-lg">
 				<CardHeader className="text-center pb-2">
 					<div className="flex justify-center mb-4">
@@ -109,19 +109,23 @@ export default async function PublicConfirmationPage({
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="space-y-6 pt-4">
-					<div className="bg-muted rounded-lg p-4 space-y-3 border">
-						<div className="flex items-center gap-3">
-							<Calendar className="h-5 w-5 text-primary" />
-							<div>
+					<p className="rounded-md border border-primary/20 bg-primary/5 p-3 text-center text-sm">
+						Tu cita está confirmada; si proporcionaste un correo válido, la
+						confirmación está en proceso.
+					</p>
+					<div className="space-y-3 overflow-hidden rounded-lg border bg-muted p-4">
+						<div className="flex min-w-0 items-start gap-3">
+							<Calendar className="h-5 w-5 shrink-0 text-primary" />
+							<div className="min-w-0 break-words">
 								<p className="text-sm font-semibold capitalize">
 									{formattedDate}
 								</p>
 								<p className="text-xs text-muted-foreground">Fecha reservada</p>
 							</div>
 						</div>
-						<div className="flex items-center gap-3">
-							<Clock className="h-5 w-5 text-primary" />
-							<div>
+						<div className="flex min-w-0 items-start gap-3">
+							<Clock className="h-5 w-5 shrink-0 text-primary" />
+							<div className="min-w-0 break-words">
 								<p className="text-sm font-semibold">
 									{formattedTime} hrs ({appointment?.totalDurationMinutes || 0}{" "}
 									min)
@@ -129,9 +133,9 @@ export default async function PublicConfirmationPage({
 								<p className="text-xs text-muted-foreground">{serviceNames}</p>
 							</div>
 						</div>
-						<div className="flex items-center gap-3">
-							<User className="h-5 w-5 text-primary" />
-							<div>
+						<div className="flex min-w-0 items-start gap-3">
+							<User className="h-5 w-5 shrink-0 text-primary" />
+							<div className="min-w-0 break-words">
 								<p className="text-sm font-semibold">{specialistName}</p>
 								<p className="text-xs text-muted-foreground">
 									Profesional asignado
@@ -139,9 +143,9 @@ export default async function PublicConfirmationPage({
 							</div>
 						</div>
 						{salon.address && (
-							<div className="flex items-center gap-3">
-								<MapPin className="h-5 w-5 text-primary" />
-								<div>
+							<div className="flex min-w-0 items-start gap-3">
+								<MapPin className="h-5 w-5 shrink-0 text-primary" />
+								<div className="min-w-0 break-words">
 									<p className="text-sm font-semibold">{salon.address}</p>
 									<p className="text-xs text-muted-foreground">
 										Ubicación del salón
@@ -149,7 +153,7 @@ export default async function PublicConfirmationPage({
 								</div>
 							</div>
 						)}
-						<div className="border-t pt-2 mt-2 flex justify-between items-center text-sm">
+						<div className="mt-2 flex flex-col gap-1 border-t pt-2 text-sm min-[360px]:flex-row min-[360px]:items-center min-[360px]:justify-between">
 							<span className="font-medium text-muted-foreground">
 								Total a pagar en el salón:
 							</span>
@@ -176,7 +180,7 @@ export default async function PublicConfirmationPage({
 						className={buttonVariants({
 							size: "lg",
 							className:
-								"w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold",
+								"min-h-11 w-full bg-[#25D366] text-center font-bold whitespace-normal text-white hover:bg-[#20bd5a]",
 						})}
 					>
 						<MessageSquare className="mr-2 h-5 w-5" />
@@ -186,7 +190,7 @@ export default async function PublicConfirmationPage({
 						href={`/${slug}`}
 						className={buttonVariants({
 							variant: "ghost",
-							className: "w-full",
+							className: "min-h-11 w-full",
 						})}
 					>
 						Volver a la página del salón

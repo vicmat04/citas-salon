@@ -35,6 +35,8 @@ export default async function PublicSalonLandingPage({
 					style={{ backgroundColor: `${salon.themeColor || "#D4AF37"}30` }}
 				>
 					{salon.logoUrl ? (
+						// The logo URL is tenant-provided and may not match configured Next Image hosts.
+						// eslint-disable-next-line @next/next/no-img-element
 						<img
 							src={salon.logoUrl}
 							alt={salon.name}

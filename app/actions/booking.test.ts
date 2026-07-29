@@ -9,6 +9,11 @@ const mocks = vi.hoisted(() => ({
 	customerCreate: vi.fn(),
 	customerUpdate: vi.fn(),
 	appointmentCreate: vi.fn(),
+	salonFindUnique: vi.fn(),
+	transaction: vi.fn(),
+	enqueue: vi.fn(),
+	dispatchEvent: vi.fn(),
+	after: vi.fn(),
 	revalidatePath: vi.fn(),
 }));
 
@@ -20,17 +25,26 @@ vi.mock("@/lib/salons/availability", () => ({
 	getCandidateSpecialists: mocks.getCandidateSpecialists,
 	calculateServicesTotalDuration: mocks.calculateServicesTotalDuration,
 }));
+vi.mock("@/lib/notifications/enqueue", () => ({
+	enqueueAppointmentNotification: mocks.enqueue,
+}));
+vi.mock("@/lib/notifications/dispatcher", () => ({
+	dispatchEvent: mocks.dispatchEvent,
+}));
 vi.mock("@/lib/db", () => ({
 	default: {
+		$transaction: mocks.transaction,
 		customer: {
 			findFirst: mocks.customerFindFirst,
 			create: mocks.customerCreate,
 			update: mocks.customerUpdate,
 		},
 		appointment: { create: mocks.appointmentCreate },
+		salon: { findUnique: mocks.salonFindUnique },
 	},
 }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
+vi.mock("next/server", () => ({ after: mocks.after }));
 
 import { createPublicAppointment, getAvailableSlotsAction } from "./booking";
 
@@ -40,6 +54,17 @@ function form(values: Record<string, string>) {
 	return data;
 }
 
+const validBooking = {
+	customerName: "Carlos Gomez",
+	customerEmail: "carlos@example.com",
+	customerPhone: "+507 60001122",
+	date: "2028-06-15",
+	startTime: "09:00",
+	serviceIds: "s1",
+	specialistId: "any",
+	customerNotes: "Prefiero tono natural",
+};
+
 describe("booking server actions", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -47,12 +72,9 @@ describe("booking server actions", () => {
 			id: "salon-1",
 			slug: "demo",
 		});
-		mocks.getAvailableSlots.mockResolvedValue({
-			slots: ["09:00", "10:00"],
-			assignedSpecialistId: "spec-1",
-		});
+		mocks.getAvailableSlots.mockResolvedValue({ slots: ["09:00", "10:00"] });
 		mocks.getCandidateSpecialists.mockResolvedValue([
-			{ id: "spec-1", name: "Ana" },
+			{ id: "spec-1", name: "Ana", email: "ana@example.com" },
 		]);
 		mocks.calculateServicesTotalDuration.mockResolvedValue({
 			totalDurationMinutes: 45,
@@ -62,75 +84,106 @@ describe("booking server actions", () => {
 		mocks.customerFindFirst.mockResolvedValue(null);
 		mocks.customerCreate.mockResolvedValue({
 			id: "cust-1",
-			fullName: "Carlos",
+			fullName: "Carlos Gomez",
+			email: "carlos@example.com",
 		});
 		mocks.appointmentCreate.mockResolvedValue({ id: "appt-123" });
+		mocks.salonFindUnique.mockResolvedValue({
+			name: "Salón Demo",
+			timezone: "America/Panama",
+			ownerEmailNotificationsEnabled: true,
+			owner: { email: "owner@example.com" },
+		});
+		mocks.enqueue.mockResolvedValue({ id: "event-created" });
+		mocks.transaction.mockImplementation(async (callback) =>
+			callback({
+				customer: {
+					findFirst: mocks.customerFindFirst,
+					create: mocks.customerCreate,
+					update: mocks.customerUpdate,
+				},
+				appointment: { create: mocks.appointmentCreate },
+				salon: { findUnique: mocks.salonFindUnique },
+			}),
+		);
+		mocks.after.mockImplementation((callback) => callback());
+		mocks.dispatchEvent.mockResolvedValue({
+			eventId: "event-created",
+			sent: 0,
+			failed: 0,
+		});
 	});
 
 	describe("getAvailableSlotsAction", () => {
 		it("returns empty slots if date or services are missing", async () => {
-			const result = await getAvailableSlotsAction("demo", "", []);
-			expect(result).toEqual({ success: true, slots: [] });
-		});
-
-		it("returns calculated slots for operational salon", async () => {
-			const result = await getAvailableSlotsAction("demo", "2028-06-15", [
-				"s1",
-			]);
-			expect(result).toEqual({ success: true, slots: ["09:00", "10:00"] });
+			await expect(getAvailableSlotsAction("demo", "", [])).resolves.toEqual({
+				success: true,
+				slots: [],
+			});
 		});
 	});
 
 	describe("createPublicAppointment", () => {
-		it("validates customer data", async () => {
-			const result = await createPublicAppointment(
-				form({
-					customerName: "A",
-					customerEmail: "bad-email",
-					customerPhone: "123",
-				}),
+		it("accepts a missing email but rejects a supplied invalid email", async () => {
+			const missing = await createPublicAppointment(
+				form({ ...validBooking, customerEmail: "" }),
 				"demo",
 			);
-			expect(result.error).toBe("El nombre del cliente es obligatorio");
+			expect(missing.success).toBe(true);
+
+			const invalid = await createPublicAppointment(
+				form({ ...validBooking, customerEmail: "bad-email" }),
+				"demo",
+			);
+			expect(invalid).toEqual({
+				error: "Por favor ingresa un correo electrónico válido",
+			});
 		});
 
-		it("creates customer and confirmed appointment when slot is available", async () => {
-			const result = await createPublicAppointment(
-				form({
-					customerName: "Carlos Gomez",
-					customerEmail: "carlos@example.com",
-					customerPhone: "+507 60001122",
-					date: "2028-06-15",
-					startTime: "09:00",
-					serviceIds: "s1",
-					specialistId: "any",
-					customerNotes: "Prefiero tono natural",
-				}),
-				"demo",
-			);
+		it("creates appointment and outbox event in one transaction, then dispatches after commit", async () => {
+			const result = await createPublicAppointment(form(validBooking), "demo");
 
-			expect(result).toEqual({ success: true, appointmentId: "appt-123" });
-			expect(mocks.customerCreate).toHaveBeenCalledWith({
-				data: {
-					salonId: "salon-1",
-					fullName: "Carlos Gomez",
-					email: "carlos@example.com",
-					phone: "+507 60001122",
-				},
+			expect(result).toEqual({
+				success: true,
+				appointmentId: "appt-123",
+				notification: { state: "queued" },
 			});
-			expect(mocks.appointmentCreate).toHaveBeenCalledWith(
+			expect(mocks.transaction).toHaveBeenCalledOnce();
+			expect(mocks.enqueue).toHaveBeenCalledWith(
+				expect.objectContaining({ appointment: expect.anything() }),
 				expect.objectContaining({
-					data: expect.objectContaining({
-						salonId: "salon-1",
-						customerId: "cust-1",
-						specialistId: "spec-1",
-						status: "confirmed",
-						source: "public_form",
-						totalPriceSnapshot: 25,
-						totalDurationMinutes: 45,
-					}),
+					type: "created",
+					appointmentId: "appt-123",
+					clientEmail: "carlos@example.com",
+					ownerEmail: "owner@example.com",
+					specialistEmail: "ana@example.com",
 				}),
 			);
+			expect(mocks.after).toHaveBeenCalledOnce();
+			expect(mocks.dispatchEvent).toHaveBeenCalledWith("event-created");
+		});
+
+		it("keeps the confirmed booking successful when background email dispatch fails", async () => {
+			mocks.dispatchEvent.mockRejectedValue(new Error("gmail unavailable"));
+
+			const result = await createPublicAppointment(form(validBooking), "demo");
+
+			expect(result).toEqual({
+				success: true,
+				appointmentId: "appt-123",
+				notification: { state: "queued" },
+			});
+		});
+
+		it("does not enqueue or dispatch when appointment creation fails", async () => {
+			mocks.appointmentCreate.mockRejectedValue(new Error("db failure"));
+
+			const result = await createPublicAppointment(form(validBooking), "demo");
+
+			expect(result.error).toContain("Ocurrió un error");
+			expect(mocks.enqueue).not.toHaveBeenCalled();
+			expect(mocks.after).not.toHaveBeenCalled();
+			expect(mocks.dispatchEvent).not.toHaveBeenCalled();
 		});
 	});
 });

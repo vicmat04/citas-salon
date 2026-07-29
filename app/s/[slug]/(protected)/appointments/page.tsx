@@ -1,5 +1,6 @@
 import { requireSalonOwner } from "@/lib/auth/helpers";
 import prisma from "@/lib/db";
+import { projectAppointmentNotificationEvents } from "@/lib/notifications/observability";
 import { dateToTimeString } from "@/lib/salons/schedules";
 import { AppointmentsView } from "./appointments-view";
 
@@ -21,6 +22,23 @@ export default async function SalonAppointmentsPage({
 					service: { select: { id: true, name: true } },
 				},
 			},
+			notificationEvents: {
+				orderBy: { createdAt: "desc" },
+				take: 5,
+				select: {
+					type: true,
+					createdAt: true,
+					deliveries: {
+						select: {
+							roles: true,
+							status: true,
+							resultCode: true,
+							recipientMasked: true,
+							updatedAt: true,
+						},
+					},
+				},
+			},
 		},
 		orderBy: [{ appointmentDate: "desc" }, { startTime: "desc" }],
 	});
@@ -37,24 +55,28 @@ export default async function SalonAppointmentsPage({
 		orderBy: { name: "asc" },
 	});
 
-	const formattedAppointments = appointments.map((appt) => ({
-		...appt,
-		appointmentDate: appt.appointmentDate.toISOString(),
-		startTime: dateToTimeString(appt.startTime),
-		endTime: dateToTimeString(appt.endTime),
-		totalPriceSnapshot:
-			typeof appt.totalPriceSnapshot === "object" &&
-			"toNumber" in appt.totalPriceSnapshot
-				? appt.totalPriceSnapshot.toNumber()
-				: Number(appt.totalPriceSnapshot),
-		appointmentServices: appt.appointmentServices.map((as) => ({
-			...as,
-			priceSnapshot:
-				typeof as.priceSnapshot === "object" && "toNumber" in as.priceSnapshot
-					? as.priceSnapshot.toNumber()
-					: Number(as.priceSnapshot),
-		})),
-	}));
+	const formattedAppointments = appointments.map((appt) => {
+		const { notificationEvents, ...appointment } = appt;
+		return {
+			...appointment,
+			appointmentDate: appt.appointmentDate.toISOString(),
+			startTime: dateToTimeString(appt.startTime),
+			endTime: dateToTimeString(appt.endTime),
+			totalPriceSnapshot:
+				typeof appt.totalPriceSnapshot === "object" &&
+				"toNumber" in appt.totalPriceSnapshot
+					? appt.totalPriceSnapshot.toNumber()
+					: Number(appt.totalPriceSnapshot),
+			appointmentServices: appt.appointmentServices.map((as) => ({
+				...as,
+				priceSnapshot:
+					typeof as.priceSnapshot === "object" && "toNumber" in as.priceSnapshot
+						? as.priceSnapshot.toNumber()
+						: Number(as.priceSnapshot),
+			})),
+			notifications: projectAppointmentNotificationEvents(notificationEvents),
+		};
+	});
 
 	const formattedServices = services.map((s) => ({
 		...s,

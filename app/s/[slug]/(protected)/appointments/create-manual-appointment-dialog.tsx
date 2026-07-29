@@ -31,10 +31,12 @@ export function CreateManualAppointmentDialog({
 	slug,
 	services,
 	specialists,
+	onCreated,
 }: {
 	slug: string;
 	services: Service[];
 	specialists: Specialist[];
+	onCreated?: (notificationState: "queued" | undefined) => void;
 }) {
 	const [isOpen, setIsOpen] = useState(false);
 	const [isPending, setIsPending] = useState(false);
@@ -111,6 +113,9 @@ export function CreateManualAppointmentDialog({
 			);
 			setErrorMessage(null);
 		} else {
+			onCreated?.(
+				"notification" in result ? result.notification?.state : undefined,
+			);
 			setIsOpen(false);
 			resetForm();
 		}

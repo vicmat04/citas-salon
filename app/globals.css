@@ -123,8 +123,39 @@
   }
   body {
     @apply bg-background text-foreground;
+    overscroll-behavior-y: none;
   }
   html {
     @apply font-sans;
+  }
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer utilities {
+  .protected-content {
+    min-width: 0;
+    overflow-x: hidden;
+    padding: 1rem;
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .mobile-bottom-nav {
+    min-height: calc(4rem + env(safe-area-inset-bottom, 0px));
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+
+  @media (min-width: 48rem) {
+    .protected-content {
+      padding: 1.5rem;
+    }
   }
 }

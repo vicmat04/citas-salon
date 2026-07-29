@@ -29,6 +29,7 @@ Lo que se aprovecha: paleta de colores, flujo de citas, lógica de disponibilida
 **Tipo:** Producto / Arquitectura
 
 El nuevo producto no es una app de salón individual. Es una plataforma SaaS donde:
+
 - El administrador de la plataforma gestiona todos los salones
 - Cada propietario tiene su propio espacio aislado
 - Los clientes finales acceden sin cuenta a través de un enlace público
@@ -43,7 +44,7 @@ El nuevo producto no es una app de salón individual. Es una plataforma SaaS don
 **Tipo:** Técnica
 
 | Capa | Tecnología | Razón |
-|------|-----------|-------|
+| ------ | ----------- | ------- |
 | Framework | Next.js 15 (App Router) | SSR, Server Components, Server Actions nativo |
 | Lenguaje | TypeScript strict | Seguridad de tipos en toda la codebase |
 | UI | shadcn/ui + Tailwind CSS | Componentes accesibles + utilidades CSS |
@@ -64,6 +65,7 @@ Drizzle fue evaluado como alternativa a Prisma. Se eligió Prisma por mejor sopo
 **Tipo:** Técnica
 
 Se usa **Supabase Auth directamente**, sin NextAuth. Razones:
+
 - Supabase Auth está incluido en el bundle de Supabase
 - Elimina una dependencia adicional
 - Integración más directa con la base de datos y RLS
@@ -125,6 +127,7 @@ El deploy objetivo es **Vercel**, que ofrece integración nativa con Next.js, ed
 La ruta oficial para el wizard de reserva es **`/book/[slug]`**, no `/[slug]/reservar`.
 
 Razones:
+
 - Elimina ambigüedad entre la página del salón y el flujo de reserva
 - Permite compartir enlaces directos de reserva (`tuapp.com/book/mi-salon`)
 - Separa claramente responsabilidades entre página pública y wizard
@@ -293,6 +296,7 @@ WhatsApp Business API (automatización de mensajes) queda para **Fase 3**.
 Toda query Prisma que acceda a datos operativos (citas, servicios, especialistas, clientes, horarios, bloqueos) **DEBE** incluir `where: { salonId }`.
 
 Esta regla aplica a:
+
 - Server Actions del panel del propietario
 - API Routes del panel del propietario
 - Cualquier lectura o escritura de datos que pertenezca a un salón específico
@@ -337,9 +341,35 @@ Esto garantiza que si el propietario cambia los precios o duraciones de sus serv
 
 ---
 
+### D-26 · Recordatorios operacionales mediante endpoint cron portable
+
+**Fecha:** 2026-07-29
+**Tipo:** Técnica / Arquitectura / Seguridad
+
+Los recordatorios de citas se ejecutan cada 15 minutos mediante
+`GET /api/cron/notifications`, con runtime Node y autenticación
+`Authorization: Bearer <CRON_SECRET>`. Vercel invoca el endpoint según
+`vercel.json`; si el plan desplegado no admite esa frecuencia, un scheduler externo
+puede invocar exactamente el mismo endpoint y contrato, sin crear una segunda ruta.
+
+El rollout se realiza después de aplicar la migración del outbox: desplegar primero
+con `OPERATIONAL_EMAIL_NOTIFICATIONS_ENABLED=false` y
+`APPOINTMENT_REMINDERS_ENABLED=false`, validar autenticación, consulta temporal,
+contadores sanitizados y backlog, activar envíos operacionales y por último los
+recordatorios. `APPOINTMENT_REMINDER_HOURS` permanece fijado en `24` durante esta
+fase y `NOTIFICATION_RETENTION_DAYS` controla la purga por lotes.
+
+Rollback: establecer `APPOINTMENT_REMINDERS_ENABLED=false` para detener nuevos
+recordatorios y, ante riesgo del proveedor, también
+`OPERATIONAL_EMAIL_NOTIFICATIONS_ENABLED=false`. No se revierten citas ni se
+reintentan entregas `unknown_after_send`; el outbox se conserva para trazabilidad.
+La rotación de `CRON_SECRET` invalida de inmediato schedulers antiguos.
+
+---
+
 ## Plantilla para nuevas decisiones
 
-Cuando se tome una nueva decisión, agregarla con el siguiente formato:
+Cuando se tome una decisión, agregarla con el siguiente formato:
 
 ```markdown
 ### D-XX · Título de la decisión

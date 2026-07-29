@@ -4,6 +4,7 @@ import {
 	getGmailAccessToken,
 	getGmailCredentials,
 	sendEmailNotification,
+	sendEmailUnit,
 	sendTrialExpirationEmail,
 } from "./mailer";
 
@@ -12,7 +13,7 @@ global.fetch = globalFetch;
 
 describe("OAuth2 Gmail API mailer module", () => {
 	beforeEach(() => {
-		vi.clearAllMocks();
+		globalFetch.mockReset();
 		process.env.GMAIL_CLIENT_ID = "test-client-id";
 		process.env.GMAIL_CLIENT_SECRET = "test-client-secret";
 		process.env.GMAIL_REFRESH_TOKEN = "test-refresh-token";
@@ -71,6 +72,59 @@ describe("OAuth2 Gmail API mailer module", () => {
 
 		expect(result.success).toBe(true);
 		expect(result.details).toHaveLength(2);
+	});
+
+	it("returns a sanitized result when Gmail rejects a unit send", async () => {
+		globalFetch
+			.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({ access_token: "fake-access-token-123" }),
+			})
+			.mockResolvedValueOnce({
+				ok: false,
+				status: 400,
+				text: async () => "raw provider response with private@example.com",
+			});
+
+		await expect(
+			sendEmailUnit({
+				to: "private@example.com",
+				subject: "Subject",
+				htmlBody: "<p>secret body</p>",
+			}),
+		).resolves.toEqual({ accepted: false, errorCode: "provider_rejected" });
+	});
+
+	it("reuses one token, limits concurrency to three and isolates batch failures", async () => {
+		let active = 0;
+		let maxActive = 0;
+		globalFetch.mockImplementationOnce(async () => ({
+			ok: true,
+			json: async () => ({ access_token: "fake-access-token-123" }),
+		}));
+		globalFetch.mockImplementation(async () => {
+			active += 1;
+			maxActive = Math.max(maxActive, active);
+			await new Promise((resolve) => setTimeout(resolve, 5));
+			active -= 1;
+			return { ok: true, json: async () => ({ id: "safe-id" }) };
+		});
+
+		const result = await sendEmailNotification({
+			to: [
+				"one@example.com",
+				"two@example.com",
+				"three@example.com",
+				"four@example.com",
+			],
+			subject: "Subject",
+			htmlBody: "<p>Body</p>",
+		});
+
+		expect(globalFetch).toHaveBeenCalledTimes(5);
+		expect(maxActive).toBeLessThanOrEqual(3);
+		expect(result.details).toHaveLength(4);
+		expect(JSON.stringify(result)).not.toContain("one@example.com");
 	});
 
 	it("sends trial expiration email including vicmat04@gmail.com and dayanisr270@gmail.com", async () => {

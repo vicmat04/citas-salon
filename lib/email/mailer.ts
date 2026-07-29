@@ -1,9 +1,19 @@
 import "server-only";
 
+import { validateEmail } from "@/lib/notifications/email-validation";
+import {
+	DELIVERY_CONCURRENCY,
+	type SafeEmailResult,
+} from "@/lib/notifications/types";
+
 export interface SendEmailOptions {
 	to: string | string[];
 	subject: string;
 	htmlBody: string;
+}
+
+interface UnitEmailOptions extends Omit<SendEmailOptions, "to"> {
+	to: string;
 }
 
 export function getGmailCredentials() {
@@ -11,22 +21,14 @@ export function getGmailCredentials() {
 	const clientSecret = process.env.GMAIL_CLIENT_SECRET?.trim();
 	const refreshToken = process.env.GMAIL_REFRESH_TOKEN?.trim();
 	const sender = process.env.GMAIL_SENDER?.trim() || "victorpty999@gmail.com";
-
 	if (!clientId || !clientSecret || !refreshToken) {
-		throw new Error(
-			"Faltan variables GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET o GMAIL_REFRESH_TOKEN.",
-		);
+		throw new Error("Gmail OAuth credentials are not configured");
 	}
-
 	return { clientId, clientSecret, refreshToken, sender };
 }
 
-/**
- * Obtains a temporary access_token from Google OAuth2 API using the refresh_token.
- */
 export async function getGmailAccessToken(): Promise<string> {
 	const { clientId, clientSecret, refreshToken } = getGmailCredentials();
-
 	const response = await fetch("https://oauth2.googleapis.com/token", {
 		method: "POST",
 		headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -37,63 +39,90 @@ export async function getGmailAccessToken(): Promise<string> {
 			grant_type: "refresh_token",
 		}),
 	});
-
-	if (!response.ok) {
-		const errorText = await response.text();
-		throw new Error(`Fallo al refrescar token de Google OAuth2: ${errorText}`);
-	}
-
-	const data = await response.json();
-	if (!data.access_token) {
-		throw new Error("Google OAuth2 no retornó access_token");
-	}
-
+	if (!response.ok) throw new Error("Gmail OAuth token refresh failed");
+	const data = (await response.json()) as { access_token?: string };
+	if (!data.access_token)
+		throw new Error("Gmail OAuth access token is missing");
 	return data.access_token;
 }
 
-/**
- * Sends a transactional email using Gmail API REST endpoint + OAuth2.0 access_token.
- * Supports sending to single email or multiple recipient emails (string or array).
- */
+export async function sendEmailUnit(
+	options: UnitEmailOptions,
+): Promise<SafeEmailResult> {
+	try {
+		const accessToken = await getGmailAccessToken();
+		return await sendWithToken(options, accessToken);
+	} catch {
+		return { accepted: false, errorCode: "oauth_failed" };
+	}
+}
+
 export async function sendEmailNotification(options: SendEmailOptions) {
-	const { sender } = getGmailCredentials();
-
-	let recipientsList: string[] = [];
-	if (Array.isArray(options.to)) {
-		recipientsList = options.to.map((e) => e.trim()).filter(Boolean);
-	} else if (typeof options.to === "string") {
-		recipientsList = options.to
-			.split(",")
-			.map((e) => e.trim())
-			.filter(Boolean);
-	}
-
-	if (recipientsList.length === 0) {
+	const recipients = (
+		Array.isArray(options.to) ? options.to : options.to.split(",")
+	)
+		.map((email) => email.trim())
+		.filter(Boolean);
+	if (recipients.length === 0)
 		throw new Error("No hay destinatarios válidos para enviar el correo");
+
+	let accessToken: string;
+	try {
+		accessToken = await getGmailAccessToken();
+	} catch {
+		const details = recipients.map(() => ({
+			success: false,
+			errorCode: "oauth_failed" as const,
+		}));
+		return { success: false, details };
 	}
+	const details = await mapWithConcurrency(
+		recipients,
+		DELIVERY_CONCURRENCY,
+		async (to) => {
+			const result = await sendWithToken(
+				{ to, subject: options.subject, htmlBody: options.htmlBody },
+				accessToken,
+			).catch(
+				(): SafeEmailResult => ({
+					accepted: false,
+					errorCode: "unknown_after_send",
+				}),
+			);
+			return {
+				success: result.accepted,
+				providerMessageId: result.providerMessageId,
+				errorCode: result.errorCode,
+			};
+		},
+	);
+	return { success: details.some((result) => result.success), details };
+}
 
-	const accessToken = await getGmailAccessToken();
-	const results = [];
-
-	for (const recipient of recipientsList) {
-		const mimeMessage = [
-			`From: ${sender}`,
-			`To: ${recipient}`,
-			`Subject: ${options.subject}`,
-			"MIME-Version: 1.0",
-			"Content-Type: text/html; charset=utf-8",
-			"",
-			options.htmlBody,
-		].join("\r\n");
-
-		// Encode in Base64 URL-Safe format
-		const encodedMessage = Buffer.from(mimeMessage)
-			.toString("base64")
-			.replace(/\+/g, "-")
-			.replace(/\//g, "_")
-			.replace(/=+$/, "");
-
-		const sendResponse = await fetch(
+async function sendWithToken(
+	options: UnitEmailOptions,
+	accessToken: string,
+): Promise<SafeEmailResult> {
+	const recipient = validateEmail(options.to);
+	if (!recipient.valid)
+		return { accepted: false, errorCode: recipient.resultCode };
+	const credentials = getGmailCredentials();
+	const sender = validateEmail(credentials.sender);
+	if (!sender.valid) return { accepted: false, errorCode: "oauth_failed" };
+	const subject = options.subject.replace(/[\r\n]+/g, " ").trim();
+	const mimeMessage = [
+		`From: ${sender.normalized}`,
+		`To: ${recipient.normalized}`,
+		`Subject: ${subject}`,
+		"MIME-Version: 1.0",
+		"Content-Type: text/html; charset=utf-8",
+		"",
+		options.htmlBody,
+	].join("\r\n");
+	const raw = Buffer.from(mimeMessage).toString("base64url");
+	let response: Response;
+	try {
+		response = await fetch(
 			"https://gmail.googleapis.com/v1/users/me/messages/send",
 			{
 				method: "POST",
@@ -101,21 +130,40 @@ export async function sendEmailNotification(options: SendEmailOptions) {
 					Authorization: `Bearer ${accessToken}`,
 					"Content-Type": "application/json",
 				},
-				body: JSON.stringify({ raw: encodedMessage }),
+				body: JSON.stringify({ raw }),
 			},
 		);
-
-		if (!sendResponse.ok) {
-			const errText = await sendResponse.text();
-			console.error(`Fallo al enviar correo a ${recipient}:`, errText);
-			results.push({ recipient, success: false, error: errText });
-		} else {
-			const resData = await sendResponse.json();
-			results.push({ recipient, success: true, id: resData.id });
-		}
+	} catch {
+		return { accepted: false, errorCode: "unknown_after_send" };
 	}
+	if (!response.ok) return { accepted: false, errorCode: "provider_rejected" };
+	try {
+		const data = (await response.json()) as { id?: string };
+		return data.id
+			? { accepted: true, providerMessageId: data.id }
+			: { accepted: false, errorCode: "unknown_after_send" };
+	} catch {
+		return { accepted: false, errorCode: "unknown_after_send" };
+	}
+}
 
-	return { success: results.some((r) => r.success), details: results };
+async function mapWithConcurrency<T, R>(
+	items: T[],
+	limit: number,
+	mapper: (item: T) => Promise<R>,
+): Promise<R[]> {
+	const results = new Array<R>(items.length);
+	let next = 0;
+	const worker = async () => {
+		while (next < items.length) {
+			const index = next++;
+			results[index] = await mapper(items[index]);
+		}
+	};
+	await Promise.allSettled(
+		Array.from({ length: Math.min(limit, items.length) }, () => worker()),
+	);
+	return results;
 }
 
 /**

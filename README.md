@@ -34,7 +34,19 @@ DIRECT_URL="postgres://..."
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL="https://..."
 NEXT_PUBLIC_SUPABASE_ANON_KEY="ey..."
+
+# Notificaciones operacionales (solo servidor; sin valores reales en Git)
+OPERATIONAL_EMAIL_NOTIFICATIONS_ENABLED=false
+APPOINTMENT_REMINDERS_ENABLED=false
+APPOINTMENT_REMINDER_HOURS=24
+CRON_SECRET=
+NOTIFICATION_RETENTION_DAYS=90
 ```
+
+`CRON_SECRET` debe ser un secreto largo configurado en el proveedor. El endpoint
+`GET /api/cron/notifications` exige `Authorization: Bearer <CRON_SECRET>`. Los
+recordatorios de esta fase usan una ventana fija de 24 horas; activa primero el
+envío operacional y después `APPOINTMENT_REMINDERS_ENABLED` tras validar el cron.
 
 ## Guía de Inicio Rápido
 

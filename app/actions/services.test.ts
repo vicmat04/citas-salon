@@ -42,8 +42,6 @@ import {
 	deleteCategory,
 	deleteService,
 	toggleServiceActive,
-	updateCategory,
-	updateService,
 } from "./services";
 
 function form(values: Record<string, string>) {
