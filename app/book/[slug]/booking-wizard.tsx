@@ -1,33 +1,33 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import {
+	Calendar as CalendarIcon,
+	Check,
+	CheckCircle2,
+	ChevronLeft,
+	ChevronRight,
+	Clock,
+	Loader2,
 	Scissors,
 	User,
-	Calendar as CalendarIcon,
-	Clock,
-	CheckCircle2,
-	ChevronRight,
-	ChevronLeft,
-	Loader2,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardHeader,
-	CardTitle,
-	CardFooter,
-	CardDescription,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+
 import {
 	createPublicAppointment,
 	getAvailableSlotsAction,
 } from "@/app/actions/booking";
+import { Button } from "@/components/ui/button";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface Service {
 	id: string;
@@ -42,6 +42,8 @@ interface Specialist {
 	name: string;
 	specialty: string | null;
 }
+
+const steps = ["Servicios", "Profesional", "Horario", "Tus datos"] as const;
 
 export function BookingWizard({
 	slug,
@@ -58,15 +60,9 @@ export function BookingWizard({
 }) {
 	const router = useRouter();
 	const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-
-	// Step 1: Selected Services
 	const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
-
-	// Step 2: Selected Specialist
 	const [selectedSpecialistId, setSelectedSpecialistId] =
 		useState<string>("any");
-
-	// Step 3: Date & Time Slot
 	const [selectedDate, setSelectedDate] = useState<string>(() => {
 		const tomorrow = new Date();
 		tomorrow.setDate(tomorrow.getDate() + 1);
@@ -75,82 +71,91 @@ export function BookingWizard({
 	const [availableSlots, setAvailableSlots] = useState<string[]>([]);
 	const [isLoadingSlots, setIsLoadingSlots] = useState(false);
 	const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>("");
-
-	// Step 4: Customer Details
 	const [customerName, setCustomerName] = useState("");
 	const [customerEmail, setCustomerEmail] = useState("");
 	const [customerPhone, setCustomerPhone] = useState("");
 	const [customerNotes, setCustomerNotes] = useState("");
-
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
-	// Calculations for Step 1 & Date Bounds
-	const selectedServices = services.filter((s) =>
-		selectedServiceIds.includes(s.id),
+	const selectedServices = services.filter((service) =>
+		selectedServiceIds.includes(service.id),
 	);
-	const totalPrice = selectedServices.reduce((sum, s) => sum + s.price, 0);
+	const totalPrice = selectedServices.reduce(
+		(sum, service) => sum + service.price,
+		0,
+	);
 	const totalDuration = selectedServices.reduce(
-		(sum, s) => sum + s.durationMinutes + s.bufferMinutes,
+		(sum, service) => sum + service.durationMinutes + service.bufferMinutes,
 		0,
 	);
 
-	const dateMinStr = useMemo(() => {
-		return new Date().toISOString().slice(0, 10);
-	}, []);
-
+	const dateMinStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
 	const dateMaxStr = useMemo(() => {
 		const maxDate = new Date();
 		maxDate.setDate(maxDate.getDate() + bookingRangeDays);
 		return maxDate.toISOString().slice(0, 10);
 	}, [bookingRangeDays]);
 
-	// Fetch available slots when Step 3, date, or specialist changes
 	useEffect(() => {
-		if (step === 3 && selectedServiceIds.length > 0 && selectedDate) {
-			let isMounted = true;
+		if (step !== 3 || selectedServiceIds.length === 0 || !selectedDate) {
+			return;
+		}
 
-			Promise.resolve().then(() => {
+		let isMounted = true;
+		Promise.resolve().then(() => {
+			if (isMounted) {
+				setIsLoadingSlots(true);
+				setSelectedTimeSlot("");
+			}
+		});
+
+		getAvailableSlotsAction(
+			slug,
+			selectedDate,
+			selectedServiceIds,
+			selectedSpecialistId,
+		)
+			.then((result) => {
 				if (isMounted) {
-					setIsLoadingSlots(true);
-					setSelectedTimeSlot("");
+					setAvailableSlots(result.slots ?? []);
+					setIsLoadingSlots(false);
+				}
+			})
+			.catch(() => {
+				if (isMounted) {
+					setAvailableSlots([]);
+					setIsLoadingSlots(false);
 				}
 			});
 
-			getAvailableSlotsAction(
-				slug,
-				selectedDate,
-				selectedServiceIds,
-				selectedSpecialistId,
-			)
-				.then((res) => {
-					if (isMounted) {
-						setIsLoadingSlots(false);
-						if (res.slots) {
-							setAvailableSlots(res.slots);
-						}
-					}
-				})
-				.catch(() => {
-					if (isMounted) setIsLoadingSlots(false);
-				});
-
-			return () => {
-				isMounted = false;
-			};
-		}
+		return () => {
+			isMounted = false;
+		};
 	}, [step, selectedDate, selectedSpecialistId, selectedServiceIds, slug]);
 
 	function toggleService(serviceId: string) {
-		setSelectedServiceIds((prev) =>
-			prev.includes(serviceId)
-				? prev.filter((id) => id !== serviceId)
-				: [...prev, serviceId],
+		setSelectedServiceIds((current) =>
+			current.includes(serviceId)
+				? current.filter((id) => id !== serviceId)
+				: [...current, serviceId],
 		);
 	}
 
-	async function handleSubmitBooking(e: React.FormEvent) {
-		e.preventDefault();
+	function goBack() {
+		if (step > 1) {
+			setStep((step - 1) as 1 | 2 | 3);
+		}
+	}
+
+	function goForward() {
+		if (step < 4) {
+			setStep((step + 1) as 2 | 3 | 4);
+		}
+	}
+
+	async function handleSubmitBooking(event: FormEvent) {
+		event.preventDefault();
 		setIsSubmitting(true);
 		setErrorMessage(null);
 
@@ -176,415 +181,374 @@ export function BookingWizard({
 		}
 	}
 
+	const continueDisabled =
+		(step === 1 && selectedServiceIds.length === 0) ||
+		(step === 3 && !selectedTimeSlot);
+
 	return (
-		<div className="min-h-dvh bg-muted/30 px-3 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-8">
-			<div className="mx-auto max-w-2xl space-y-6">
-				<div className="text-center mb-6">
-					<h1 className="text-3xl font-extrabold capitalize">{salonName}</h1>
-					<p className="text-muted-foreground mt-1">
-						Reserva tu cita en pocos pasos
+		<div className="flex h-dvh w-full flex-col overflow-hidden bg-muted/30">
+			<header className="shrink-0 border-b bg-background/95 pb-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur">
+				<div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
+					<div className="min-w-0">
+						<p className="truncate text-lg font-bold capitalize">{salonName}</p>
+						<p className="text-xs text-muted-foreground">
+							Reserva en pocos pasos
+						</p>
+					</div>
+					<p className="shrink-0 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary">
+						Paso {step} de 4
 					</p>
 				</div>
+				<ol
+					aria-label="Progreso de la reserva"
+					className="mx-auto mt-3 grid max-w-3xl grid-cols-4 gap-1.5"
+				>
+					{steps.map((label, index) => {
+						const number = index + 1;
+						const isCurrent = step === number;
+						const isComplete = step > number;
+						return (
+							<li key={label} className="min-w-0 text-center">
+								<div
+									aria-current={isCurrent ? "step" : undefined}
+									className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${
+										isCurrent
+											? "bg-primary text-primary-foreground"
+											: isComplete
+												? "bg-primary/15 text-primary"
+												: "bg-muted text-muted-foreground"
+									}`}
+								>
+									{isComplete ? <Check className="h-4 w-4" /> : number}
+								</div>
+								<span className="mt-1 hidden truncate text-[11px] text-muted-foreground min-[360px]:block">
+									{label}
+								</span>
+							</li>
+						);
+					})}
+				</ol>
+			</header>
 
-				{/* Step Indicator */}
-				<div className="flex items-center justify-center gap-3 mb-6">
-					{[1, 2, 3, 4].map((s) => (
-						<div key={s} className="flex items-center gap-2">
-							<Badge
-								variant={
-									step === s ? "default" : step > s ? "secondary" : "outline"
-								}
-								className="h-8 w-8 rounded-full flex items-center justify-center p-0 text-sm font-bold"
-							>
-								{step > s ? <CheckCircle2 className="h-4 w-4" /> : s}
-							</Badge>
-							{s < 4 && <div className="h-0.5 w-6 sm:w-10 bg-border" />}
+			<main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 sm:px-6 sm:py-6">
+				<div className="mx-auto max-w-3xl">
+					{errorMessage && (
+						<div
+							role="alert"
+							className="mb-4 rounded-xl bg-destructive/15 p-4 text-sm font-medium text-destructive"
+						>
+							{errorMessage}
 						</div>
-					))}
-				</div>
+					)}
 
-				{step > 1 && (
-					<div
-						aria-label="Resumen de la reserva"
-						className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card p-3 text-sm"
-					>
-						<span className="min-w-0 font-medium">
-							{selectedServices.map((service) => service.name).join(", ")}
-						</span>
-						<span className="shrink-0 font-bold text-primary">
-							{totalDuration} min · ${totalPrice.toFixed(2)}
-						</span>
-					</div>
-				)}
+					{step === 1 && (
+						<Card className="border-0 shadow-sm sm:border">
+							<CardHeader>
+								<CardTitle className="flex items-center gap-2 text-xl">
+									<Scissors className="h-5 w-5 text-primary" /> Elige tus
+									servicios
+								</CardTitle>
+								<CardDescription>
+									Puedes seleccionar uno o varios para la misma visita.
+								</CardDescription>
+							</CardHeader>
+							<CardContent className="space-y-3">
+								{services.length === 0 ? (
+									<p className="py-8 text-center text-muted-foreground">
+										No hay servicios disponibles.
+									</p>
+								) : (
+									services.map((service) => {
+										const isSelected = selectedServiceIds.includes(service.id);
+										return (
+											<button
+												type="button"
+												key={service.id}
+												aria-pressed={isSelected}
+												onClick={() => toggleService(service.id)}
+												className={`flex min-h-16 w-full items-center justify-between gap-3 rounded-2xl border p-4 text-left transition active:scale-[0.98] ${
+													isSelected
+														? "border-primary bg-primary/5 shadow-sm"
+														: "bg-background hover:border-primary/40"
+												}`}
+											>
+												<span className="min-w-0">
+													<span className="flex items-center gap-2 font-semibold">
+														<span className="truncate">{service.name}</span>
+														{isSelected && (
+															<CheckCircle2 className="h-5 w-5 shrink-0 text-primary" />
+														)}
+													</span>
+													<span className="text-sm text-muted-foreground">
+														{service.durationMinutes} min
+													</span>
+												</span>
+												<span className="shrink-0 text-lg font-bold text-primary">
+													${service.price.toFixed(2)}
+												</span>
+											</button>
+										);
+									})
+								)}
+							</CardContent>
+						</Card>
+					)}
 
-				{errorMessage && (
-					<div
-						role="alert"
-						className="rounded-md bg-destructive/15 p-4 text-sm font-medium text-destructive"
-					>
-						{errorMessage}
-					</div>
-				)}
-
-				{/* STEP 1: SERVICES */}
-				{step === 1 && (
-					<Card>
-						<CardHeader>
-							<CardTitle className="flex items-center gap-2">
-								<Scissors className="h-5 w-5 text-primary" /> Paso 1: Selecciona
-								tus Servicios
-							</CardTitle>
-							<CardDescription>
-								Puedes elegir uno o varios servicios para tu visita.
-							</CardDescription>
-						</CardHeader>
-						<CardContent className="space-y-3">
-							{services.length === 0 ? (
-								<p className="text-center py-6 text-muted-foreground">
-									No hay servicios disponibles.
-								</p>
-							) : (
-								services.map((srv) => {
-									const isSelected = selectedServiceIds.includes(srv.id);
+					{step === 2 && (
+						<Card className="border-0 shadow-sm sm:border">
+							<CardHeader>
+								<CardTitle className="flex items-center gap-2 text-xl">
+									<User className="h-5 w-5 text-primary" /> Elige profesional
+								</CardTitle>
+								<CardDescription>
+									Selecciona a alguien o déjanos asignar la primera opción
+									disponible.
+								</CardDescription>
+							</CardHeader>
+							<CardContent className="space-y-3">
+								{[
+									{
+										id: "any",
+										name: "Cualquiera disponible",
+										specialty: "La opción con disponibilidad más próxima",
+									},
+									...specialists,
+								].map((specialist) => {
+									const isSelected = selectedSpecialistId === specialist.id;
 									return (
 										<button
 											type="button"
-											key={srv.id}
+											key={specialist.id}
 											aria-pressed={isSelected}
-											onClick={() => toggleService(srv.id)}
-											className={`flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border p-4 text-left transition-all ${
+											onClick={() => setSelectedSpecialistId(specialist.id)}
+											className={`flex min-h-16 w-full items-center justify-between gap-3 rounded-2xl border p-4 text-left transition active:scale-[0.98] ${
 												isSelected
 													? "border-primary bg-primary/5 shadow-sm"
-													: "hover:border-primary/50"
+													: "bg-background hover:border-primary/40"
 											}`}
 										>
-											<div>
-												<h3 className="font-semibold flex items-center gap-2">
-													{srv.name}
-													{isSelected && (
-														<CheckCircle2 className="h-4 w-4 text-primary" />
-													)}
-												</h3>
-												<p className="text-sm text-muted-foreground">
-													{srv.durationMinutes} min
-												</p>
-											</div>
-											<div className="shrink-0 text-lg font-bold text-primary">
-												${srv.price.toFixed(2)}
-											</div>
+											<span className="min-w-0">
+												<span className="block truncate font-semibold">
+													{specialist.name}
+												</span>
+												{specialist.specialty && (
+													<span className="block text-sm text-muted-foreground">
+														{specialist.specialty}
+													</span>
+												)}
+											</span>
+											<span
+												className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${
+													isSelected
+														? "border-primary bg-primary text-primary-foreground"
+														: "border-muted-foreground/40"
+												}`}
+											>
+												{isSelected && <Check className="h-4 w-4" />}
+											</span>
 										</button>
 									);
-								})
-							)}
-						</CardContent>
-						<CardFooter className="flex flex-wrap justify-between gap-2 border-t pt-4">
-							<div className="text-sm">
-								<p className="font-medium text-muted-foreground">
-									{selectedServiceIds.length}{" "}
-									{selectedServiceIds.length === 1 ? "servicio" : "servicios"} •{" "}
-									{totalDuration} min
-								</p>
-								<p className="text-lg font-bold text-primary">
-									${totalPrice.toFixed(2)}
-								</p>
-							</div>
-							<Button
-								disabled={selectedServiceIds.length === 0}
-								onClick={() => setStep(2)}
-								className="min-h-11 gap-2 font-bold"
-							>
-								Continuar <ChevronRight className="h-4 w-4" />
-							</Button>
-						</CardFooter>
-					</Card>
-				)}
+								})}
+							</CardContent>
+						</Card>
+					)}
 
-				{/* STEP 2: SPECIALIST */}
-				{step === 2 && (
-					<Card>
-						<CardHeader>
-							<CardTitle className="flex items-center gap-2">
-								<User className="h-5 w-5 text-primary" /> Paso 2: Selecciona
-								Especialista
-							</CardTitle>
-							<CardDescription>
-								Elige tu profesional preferido o deja que asignemos al primero
-								libre.
-							</CardDescription>
-						</CardHeader>
-						<CardContent className="space-y-3">
-							<button
-								type="button"
-								aria-pressed={selectedSpecialistId === "any"}
-								onClick={() => setSelectedSpecialistId("any")}
-								className={`min-h-11 w-full rounded-lg border p-4 text-left transition-all ${
-									selectedSpecialistId === "any"
-										? "border-primary bg-primary/5 shadow-sm"
-										: "hover:border-primary/50"
-								}`}
-							>
-								<div className="flex items-center justify-between">
-									<div>
-										<h3 className="font-semibold flex items-center gap-2">
-											Cualquiera disponible
-											{selectedSpecialistId === "any" && (
-												<CheckCircle2 className="h-4 w-4 text-primary" />
-											)}
-										</h3>
-										<p className="text-sm text-muted-foreground">
-											Asigna al profesional con disponibilidad inmediata
-										</p>
-									</div>
+					{step === 3 && (
+						<Card className="border-0 shadow-sm sm:border">
+							<CardHeader>
+								<CardTitle className="flex items-center gap-2 text-xl">
+									<CalendarIcon className="h-5 w-5 text-primary" /> Elige fecha
+									y hora
+								</CardTitle>
+								<CardDescription>
+									Los horarios se actualizan según el día y profesional
+									elegidos.
+								</CardDescription>
+							</CardHeader>
+							<CardContent className="space-y-6">
+								<div>
+									<Label htmlFor="booking-date" className="font-semibold">
+										Fecha
+									</Label>
+									<Input
+										id="booking-date"
+										type="date"
+										value={selectedDate}
+										min={dateMinStr}
+										max={dateMaxStr}
+										onChange={(event) => setSelectedDate(event.target.value)}
+										className="mt-2 min-h-12 text-base"
+										required
+									/>
 								</div>
-							</button>
-
-							{specialists.map((spec) => {
-								const isSelected = selectedSpecialistId === spec.id;
-								return (
-									<button
-										type="button"
-										key={spec.id}
-										aria-pressed={isSelected}
-										onClick={() => setSelectedSpecialistId(spec.id)}
-										className={`min-h-11 w-full rounded-lg border p-4 text-left transition-all ${
-											isSelected
-												? "border-primary bg-primary/5 shadow-sm"
-												: "hover:border-primary/50"
-										}`}
-									>
-										<div className="flex items-center justify-between">
-											<div>
-												<h3 className="font-semibold flex items-center gap-2">
-													{spec.name}
-													{isSelected && (
-														<CheckCircle2 className="h-4 w-4 text-primary" />
-													)}
-												</h3>
-												{spec.specialty && (
-													<p className="text-sm text-muted-foreground">
-														{spec.specialty}
-													</p>
-												)}
-											</div>
+								<div>
+									<Label className="mb-3 flex items-center gap-2 font-semibold">
+										<Clock className="h-4 w-4 text-primary" /> Horarios
+										disponibles
+									</Label>
+									{isLoadingSlots ? (
+										<div className="flex min-h-32 items-center justify-center gap-2 text-sm text-muted-foreground">
+											<Loader2 className="h-5 w-5 animate-spin" /> Buscando
+											horarios…
 										</div>
-									</button>
-								);
-							})}
-						</CardContent>
-						<CardFooter className="flex flex-wrap justify-between gap-2 border-t pt-4">
-							<Button
-								variant="outline"
-								onClick={() => setStep(1)}
-								className="min-h-11 gap-2"
-							>
-								<ChevronLeft className="h-4 w-4" /> Volver
-							</Button>
-							<Button
-								onClick={() => setStep(3)}
-								className="min-h-11 gap-2 font-bold"
-							>
-								Continuar <ChevronRight className="h-4 w-4" />
-							</Button>
-						</CardFooter>
-					</Card>
-				)}
-
-				{/* STEP 3: DATE & TIME */}
-				{step === 3 && (
-					<Card>
-						<CardHeader>
-							<CardTitle className="flex items-center gap-2">
-								<CalendarIcon className="h-5 w-5 text-primary" /> Paso 3: Fecha
-								y Horario
-							</CardTitle>
-							<CardDescription>
-								Selecciona el día y la hora de tu cita.
-							</CardDescription>
-						</CardHeader>
-						<CardContent className="space-y-6">
-							<div>
-								<Label htmlFor="booking-date" className="font-bold text-sm">
-									Fecha
-								</Label>
-								<Input
-									id="booking-date"
-									type="date"
-									value={selectedDate}
-									min={dateMinStr}
-									max={dateMaxStr}
-									onChange={(e) => setSelectedDate(e.target.value)}
-									className="mt-1 min-h-11"
-									required
-								/>
-							</div>
-
-							<div>
-								<Label className="font-bold text-sm flex items-center gap-2 mb-2">
-									<Clock className="h-4 w-4 text-primary" /> Horarios
-									Disponibles
-								</Label>
-
-								{isLoadingSlots ? (
-									<div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
-										<Loader2 className="h-5 w-5 animate-spin" /> Buscando turnos
-										disponibles...
-									</div>
-								) : availableSlots.length === 0 ? (
-									<p className="text-center py-6 text-sm text-muted-foreground bg-muted/20 rounded-md">
-										No hay turnos disponibles para esta fecha. Intenta
-										seleccionando otro día o profesional.
-									</p>
-								) : (
-									<div className="grid max-h-56 grid-cols-2 gap-2 overflow-y-auto rounded-md border p-1 min-[360px]:grid-cols-3 sm:grid-cols-4">
-										{availableSlots.map((time) => {
-											const isSelected = selectedTimeSlot === time;
-											return (
-												<button
-													type="button"
-													key={time}
-													onClick={() => setSelectedTimeSlot(time)}
-													className={`min-h-11 rounded-md border px-3 py-2 text-center text-sm font-semibold transition-all ${
-														isSelected
-															? "bg-primary text-primary-foreground border-primary shadow"
-															: "bg-background hover:bg-accent text-foreground"
-													}`}
-												>
-													{time}
-												</button>
-											);
-										})}
-									</div>
-								)}
-							</div>
-						</CardContent>
-						<CardFooter className="flex flex-wrap justify-between gap-2 border-t pt-4">
-							<Button
-								variant="outline"
-								onClick={() => setStep(2)}
-								className="min-h-11 gap-2"
-							>
-								<ChevronLeft className="h-4 w-4" /> Volver
-							</Button>
-							<Button
-								disabled={!selectedTimeSlot}
-								onClick={() => setStep(4)}
-								className="min-h-11 gap-2 font-bold"
-							>
-								Continuar <ChevronRight className="h-4 w-4" />
-							</Button>
-						</CardFooter>
-					</Card>
-				)}
-
-				{/* STEP 4: CUSTOMER DETAILS */}
-				{step === 4 && (
-					<Card>
-						<CardHeader>
-							<CardTitle className="flex items-center gap-2">
-								<User className="h-5 w-5 text-primary" /> Paso 4: Tus Datos de
-								Contacto
-							</CardTitle>
-							<CardDescription>
-								Ingresa tus datos para registrar y confirmar tu cita.
-							</CardDescription>
-						</CardHeader>
-						<form onSubmit={handleSubmitBooking}>
-							<CardContent className="space-y-4">
-								<div className="bg-muted/40 p-4 rounded-md space-y-1 text-sm border">
-									<p>
-										<span className="font-bold">Fecha y Hora:</span>{" "}
-										{selectedDate} a las {selectedTimeSlot}
-									</p>
-									<p>
-										<span className="font-bold">Servicios:</span>{" "}
-										{selectedServices.map((s) => s.name).join(", ")} (
-										{totalDuration} min)
-									</p>
-									<p>
-										<span className="font-bold">Total a pagar:</span>{" "}
-										<span className="text-primary font-bold">
-											${totalPrice.toFixed(2)}
-										</span>
-									</p>
-								</div>
-
-								<div>
-									<Label htmlFor="cust-name">Nombre Completo *</Label>
-									<Input
-										className="min-h-11"
-										id="cust-name"
-										value={customerName}
-										onChange={(e) => setCustomerName(e.target.value)}
-										placeholder="ej: María Pérez"
-										required
-									/>
-								</div>
-
-								<div>
-									<Label htmlFor="cust-email">
-										Correo Electrónico (opcional)
-									</Label>
-									<Input
-										className="min-h-11"
-										id="cust-email"
-										type="email"
-										value={customerEmail}
-										onChange={(e) => setCustomerEmail(e.target.value)}
-										placeholder="maria@ejemplo.com"
-									/>
-								</div>
-
-								<div>
-									<Label htmlFor="cust-phone">WhatsApp / Teléfono *</Label>
-									<Input
-										className="min-h-11"
-										id="cust-phone"
-										type="tel"
-										value={customerPhone}
-										onChange={(e) => setCustomerPhone(e.target.value)}
-										placeholder="+507 6000 0000"
-										required
-									/>
-								</div>
-
-								<div>
-									<Label htmlFor="cust-notes">
-										Notas adicionales (opcional)
-									</Label>
-									<Input
-										className="min-h-11"
-										id="cust-notes"
-										value={customerNotes}
-										onChange={(e) => setCustomerNotes(e.target.value)}
-										placeholder="ej: Alguna preferencia o detalle..."
-									/>
+									) : availableSlots.length === 0 ? (
+										<p className="rounded-2xl bg-muted p-5 text-center text-sm text-muted-foreground">
+											No hay horarios para esta fecha. Prueba otro día o
+											profesional.
+										</p>
+									) : (
+										<div className="grid grid-cols-2 gap-3 min-[360px]:grid-cols-3 sm:grid-cols-4">
+											{availableSlots.map((time) => {
+												const isSelected = selectedTimeSlot === time;
+												return (
+													<button
+														type="button"
+														key={time}
+														aria-pressed={isSelected}
+														onClick={() => setSelectedTimeSlot(time)}
+														className={`min-h-12 rounded-xl border px-3 py-2 text-center text-base font-semibold transition active:scale-[0.98] ${
+															isSelected
+																? "border-primary bg-primary text-primary-foreground shadow-sm"
+																: "bg-background hover:border-primary/50 hover:bg-accent"
+														}`}
+													>
+														{time}
+													</button>
+												);
+											})}
+										</div>
+									)}
 								</div>
 							</CardContent>
-							<CardFooter className="flex flex-wrap justify-between gap-2 border-t pt-4 max-[359px]:flex-col">
-								<Button
-									type="button"
-									variant="outline"
-									onClick={() => setStep(3)}
-									className="min-h-11 gap-2"
+						</Card>
+					)}
+
+					{step === 4 && (
+						<Card className="border-0 shadow-sm sm:border">
+							<CardHeader>
+								<CardTitle className="flex items-center gap-2 text-xl">
+									<User className="h-5 w-5 text-primary" /> Completa tus datos
+								</CardTitle>
+								<CardDescription>
+									Los usaremos para registrar y confirmar tu cita.
+								</CardDescription>
+							</CardHeader>
+							<CardContent>
+								<form
+									id="booking-details-form"
+									onSubmit={handleSubmitBooking}
+									className="space-y-4"
 								>
-									<ChevronLeft className="h-4 w-4" /> Volver
-								</Button>
-								<Button
-									type="submit"
-									disabled={isSubmitting}
-									className="min-h-11 gap-2 font-bold"
-								>
-									{isSubmitting ? (
-										<Loader2 className="h-4 w-4 animate-spin" />
-									) : (
-										"Confirmar Reserva"
-									)}
-								</Button>
-							</CardFooter>
-						</form>
-					</Card>
-				)}
-			</div>
+									<div className="rounded-2xl border bg-muted/40 p-4 text-sm">
+										<p className="font-semibold">
+											{selectedDate} · {selectedTimeSlot}
+										</p>
+										<p className="mt-1 text-muted-foreground">
+											{selectedServices
+												.map((service) => service.name)
+												.join(", ")}
+										</p>
+									</div>
+									<div>
+										<Label htmlFor="cust-name">Nombre completo *</Label>
+										<Input
+											id="cust-name"
+											value={customerName}
+											onChange={(event) => setCustomerName(event.target.value)}
+											placeholder="María Pérez"
+											className="mt-1.5 min-h-12 text-base"
+											required
+										/>
+									</div>
+									<div>
+										<Label htmlFor="cust-email">
+											Correo electrónico (opcional)
+										</Label>
+										<Input
+											id="cust-email"
+											type="email"
+											value={customerEmail}
+											onChange={(event) => setCustomerEmail(event.target.value)}
+											placeholder="maria@ejemplo.com"
+											className="mt-1.5 min-h-12 text-base"
+										/>
+									</div>
+									<div>
+										<Label htmlFor="cust-phone">WhatsApp / Teléfono *</Label>
+										<Input
+											id="cust-phone"
+											type="tel"
+											value={customerPhone}
+											onChange={(event) => setCustomerPhone(event.target.value)}
+											placeholder="+507 6000 0000"
+											className="mt-1.5 min-h-12 text-base"
+											required
+										/>
+									</div>
+									<div>
+										<Label htmlFor="cust-notes">
+											Notas adicionales (opcional)
+										</Label>
+										<Input
+											id="cust-notes"
+											value={customerNotes}
+											onChange={(event) => setCustomerNotes(event.target.value)}
+											placeholder="Preferencias o detalles"
+											className="mt-1.5 min-h-12 text-base"
+										/>
+									</div>
+								</form>
+							</CardContent>
+						</Card>
+					)}
+				</div>
+			</main>
+
+			<footer className="shrink-0 border-t bg-background/95 pb-[max(0.75rem,env(safe-area-inset-bottom))] pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] pt-3 shadow-[0_-8px_24px_rgba(0,0,0,0.06)] backdrop-blur">
+				<div className="mx-auto flex max-w-3xl items-center gap-3">
+					<div className="min-w-0 flex-1">
+						<p className="truncate text-xs text-muted-foreground">
+							{selectedServiceIds.length === 0
+								? "Selecciona tus servicios"
+								: `${selectedServiceIds.length} ${
+										selectedServiceIds.length === 1 ? "servicio" : "servicios"
+									} · ${totalDuration} min`}
+						</p>
+						<p className="text-lg font-bold text-primary">
+							${totalPrice.toFixed(2)}
+						</p>
+					</div>
+					{step > 1 && (
+						<Button
+							type="button"
+							variant="outline"
+							onClick={goBack}
+							className="min-h-11 min-w-11 px-3"
+							aria-label="Volver al paso anterior"
+						>
+							<ChevronLeft className="h-5 w-5" />
+							<span className="hidden sm:inline">Volver</span>
+						</Button>
+					)}
+					<Button
+						type={step === 4 ? "submit" : "button"}
+						form={step === 4 ? "booking-details-form" : undefined}
+						disabled={continueDisabled || isSubmitting}
+						onClick={step < 4 ? goForward : undefined}
+						className="min-h-11 min-w-32 gap-2 font-bold active:scale-[0.98]"
+					>
+						{isSubmitting ? (
+							<Loader2 className="h-5 w-5 animate-spin" />
+						) : step === 4 ? (
+							"Confirmar reserva"
+						) : (
+							<>
+								Continuar <ChevronRight className="h-4 w-4" />
+							</>
+						)}
+					</Button>
+				</div>
+			</footer>
 		</div>
 	);
 }

@@ -1,30 +1,36 @@
 "use client";
 
-import { useState } from "react";
 import {
-	Search,
-	Phone,
-	Mail,
 	Cake,
+	CalendarClock,
+	Mail,
 	MessageSquare,
+	Phone,
+	Search,
 	Trash2,
-	FileText,
+	UserRound,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
+
+import { deleteCustomer, updateCustomer } from "@/app/actions/customers";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import {
 	Dialog,
 	DialogContent,
 	DialogHeader,
 	DialogTitle,
-	DialogFooter,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+	Sheet,
+	SheetContent,
+	SheetHeader,
+	SheetTitle,
+} from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreateCustomerDialog } from "./create-customer-dialog";
-import { deleteCustomer, updateCustomer } from "@/app/actions/customers";
 
 interface CustomerAppointment {
 	id: string;
@@ -50,6 +56,75 @@ interface Customer {
 	appointments: CustomerAppointment[];
 }
 
+const MOBILE_QUERY = "(max-width: 767px)";
+
+function subscribeToMobileQuery(onChange: () => void) {
+	const mediaQuery = window.matchMedia(MOBILE_QUERY);
+	mediaQuery.addEventListener("change", onChange);
+	return () => mediaQuery.removeEventListener("change", onChange);
+}
+
+function getMobileSnapshot() {
+	return window.matchMedia(MOBILE_QUERY).matches;
+}
+
+function getServerSnapshot() {
+	return false;
+}
+
+function CustomerDetailsModal({
+	open,
+	onOpenChange,
+	children,
+}: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	children: ReactNode;
+}) {
+	const isMobile = useSyncExternalStore(
+		subscribeToMobileQuery,
+		getMobileSnapshot,
+		getServerSnapshot,
+	);
+
+	if (isMobile) {
+		return (
+			<Sheet open={open} onOpenChange={onOpenChange}>
+				<SheetContent
+					side="bottom"
+					className="max-h-[94dvh] gap-0 overflow-hidden rounded-t-3xl border-x p-0 duration-300 [&_[data-slot=sheet-close]]:min-h-11 [&_[data-slot=sheet-close]]:min-w-11"
+				>
+					<div
+						aria-hidden="true"
+						className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-muted-foreground/30"
+					/>
+					<SheetHeader className="shrink-0 border-b px-4 pb-4 pt-3 pr-14 text-left">
+						<SheetTitle className="text-lg font-bold">
+							Ficha e historial del cliente
+						</SheetTitle>
+					</SheetHeader>
+					<div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+						{children}
+					</div>
+				</SheetContent>
+			</Sheet>
+		);
+	}
+
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent className="max-h-[90dvh] max-w-2xl gap-0 overflow-hidden p-0">
+				<DialogHeader className="shrink-0 border-b p-4 pr-14">
+					<DialogTitle className="text-lg font-bold">
+						Ficha e historial del cliente
+					</DialogTitle>
+				</DialogHeader>
+				<div className="min-h-0 overflow-y-auto p-4">{children}</div>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
 export function CustomersView({
 	slug,
 	salonName,
@@ -65,21 +140,17 @@ export function CustomersView({
 	>("all");
 	const [isPending, setIsPending] = useState(false);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-	// Customer detail / edit dialog
 	const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
 		null,
 	);
 	const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
-
-	// Edit fields
 	const [editName, setEditName] = useState("");
 	const [editPhone, setEditPhone] = useState("");
 	const [editEmail, setEditEmail] = useState("");
 	const [editBirthday, setEditBirthday] = useState("");
 	const [editNotes, setEditNotes] = useState("");
 
-	const currentMonth = new Date().getMonth() + 1; // 1..12
+	const currentMonth = new Date().getMonth() + 1;
 
 	function openDetailDialog(customer: Customer) {
 		setSelectedCustomer(customer);
@@ -134,38 +205,31 @@ export function CustomersView({
 		}
 	}
 
-	// Filter customers by search term and tabs
-	const filteredCustomers = customers.filter((cust) => {
+	const filteredCustomers = customers.filter((customer) => {
+		const normalizedSearch = searchTerm.toLowerCase();
 		const matchesSearch =
-			cust.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-			cust.phone.includes(searchTerm) ||
-			(cust.email &&
-				cust.email.toLowerCase().includes(searchTerm.toLowerCase()));
+			customer.fullName.toLowerCase().includes(normalizedSearch) ||
+			customer.phone.includes(searchTerm) ||
+			customer.email?.toLowerCase().includes(normalizedSearch);
 
 		if (!matchesSearch) return false;
-
 		if (selectedTab === "birthdays") {
-			if (!cust.birthday) return false;
-			const bMonth = new Date(cust.birthday).getUTCMonth() + 1;
-			return bMonth === currentMonth;
+			if (!customer.birthday) return false;
+			return new Date(customer.birthday).getUTCMonth() + 1 === currentMonth;
 		}
-
-		if (selectedTab === "frequent") {
-			return cust.completedCount >= 3;
-		}
-
+		if (selectedTab === "frequent") return customer.completedCount >= 3;
 		return true;
 	});
 
 	return (
-		<div className="min-w-0 space-y-6">
-			{errorMessage && (
-				<div className="flex items-center justify-between gap-3 rounded-md bg-destructive/15 p-4 text-sm font-medium text-destructive">
+		<div className="min-w-0 space-y-5 sm:space-y-6">
+			{errorMessage && !isDetailDialogOpen && (
+				<div className="flex items-center justify-between gap-3 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm font-medium text-destructive">
 					<span className="min-w-0">{errorMessage}</span>
 					<button
 						type="button"
 						onClick={() => setErrorMessage(null)}
-						className="min-h-11 shrink-0 px-2 text-xs underline"
+						className="min-h-11 shrink-0 px-2 text-xs underline active:scale-[0.98]"
 					>
 						Cerrar
 					</button>
@@ -174,205 +238,187 @@ export function CustomersView({
 
 			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 				<div>
-					<h2 className="text-2xl font-bold tracking-tight">
-						Directorio de Clientes (CRM)
-					</h2>
-					<p className="text-muted-foreground">
-						Historial de visitas, métricas de consumo y cumpleaños de tus
-						clientes.
+					<h2 className="text-2xl font-bold tracking-tight">Clientes</h2>
+					<p className="text-sm text-muted-foreground sm:text-base">
+						Consulta contactos, visitas y preferencias desde un solo lugar.
 					</p>
 				</div>
-				<div className="[&_[data-slot=button]]:min-h-11">
+				<div className="[&_[data-slot=button]]:min-h-11 [&_[data-slot=button]]:w-full [&_[data-slot=button]]:active:scale-[0.98] sm:[&_[data-slot=button]]:w-auto">
 					<CreateCustomerDialog
 						slug={slug}
 						onSelectExisting={(id) => {
-							const found = customers.find((c) => c.id === id);
+							const found = customers.find((customer) => customer.id === id);
 							if (found) openDetailDialog(found);
 						}}
 					/>
 				</div>
 			</div>
 
-			{/* Search Bar & Tabs */}
 			<div className="space-y-4">
 				<div className="relative">
-					<Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+					<Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 					<Input
-						placeholder="Buscar por nombre, teléfono o correo electrónico..."
+						aria-label="Buscar clientes"
+						placeholder="Buscar por nombre, teléfono o correo..."
 						value={searchTerm}
-						onChange={(e) => setSearchTerm(e.target.value)}
-						className="min-h-11 pl-9"
+						onChange={(event) => setSearchTerm(event.target.value)}
+						className="min-h-11 rounded-xl bg-card pl-9"
 					/>
 				</div>
 
 				<Tabs
-					defaultValue="all"
-					onValueChange={(v) =>
-						setSelectedTab(v as "all" | "birthdays" | "frequent")
+					value={selectedTab}
+					onValueChange={(value) =>
+						setSelectedTab(value as "all" | "birthdays" | "frequent")
 					}
 				>
-					<TabsList className="grid h-auto min-h-11 w-full max-w-md grid-cols-3">
-						<TabsTrigger
-							value="all"
-							className="min-h-11 whitespace-normal text-xs font-bold"
-						>
+					<TabsList className="grid h-auto min-h-11 w-full max-w-md grid-cols-3 rounded-xl">
+						<TabsTrigger value="all" className="min-h-11 text-xs font-bold">
 							Todos ({customers.length})
 						</TabsTrigger>
 						<TabsTrigger
 							value="birthdays"
 							className="min-h-11 whitespace-normal text-xs font-bold"
 						>
-							Cumpleaños Mes
+							Cumpleaños
 						</TabsTrigger>
 						<TabsTrigger
 							value="frequent"
 							className="min-h-11 whitespace-normal text-xs font-bold"
 						>
-							Frecuentes (3+)
+							Frecuentes
 						</TabsTrigger>
 					</TabsList>
 
-					<TabsContent value={selectedTab} className="mt-6">
+					<TabsContent value={selectedTab} className="mt-4">
 						{filteredCustomers.length === 0 ? (
-							<Card className="p-8 text-center text-muted-foreground sm:p-12">
+							<div className="rounded-2xl border bg-card p-8 text-center text-sm text-muted-foreground sm:p-12">
 								No se encontraron clientes para este filtro.
-							</Card>
+							</div>
 						) : (
-							<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-								{filteredCustomers.map((cust) => {
-									const cleanPhone = cust.phone.replace(/[^0-9]/g, "");
-
-									// Standard WhatsApp message
-									const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(`Hola ${cust.fullName}, te escribimos de parte de ${salonName}.`)}`;
-
-									// Birthday WhatsApp message
-									const waBirthdayUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(`¡Hola ${cust.fullName}! 🎉 De parte de ${salonName} te deseamos un muy feliz cumpleaños. Queremos regalarte un descuento especial en tu próxima visita. ¡Agenda tu cita con nosotros!`)}`;
+							<div className="overflow-hidden rounded-2xl border bg-card shadow-sm md:grid md:grid-cols-2 md:gap-4 md:overflow-visible md:rounded-none md:border-0 md:bg-transparent md:shadow-none lg:grid-cols-3">
+								{filteredCustomers.map((customer) => {
+									const cleanPhone = customer.phone.replace(/[^0-9]/g, "");
+									const standardMessage = `Hola ${customer.fullName}, te escribimos de parte de ${salonName}.`;
+									const birthdayMessage = `¡Hola ${customer.fullName}! 🎉 De parte de ${salonName} te deseamos un muy feliz cumpleaños. Queremos regalarte un descuento especial en tu próxima visita. ¡Agenda tu cita con nosotros!`;
+									const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(
+										selectedTab === "birthdays"
+											? birthdayMessage
+											: standardMessage,
+									)}`;
 
 									return (
-										<Card
-											key={cust.id}
-											className="overflow-hidden hover:border-primary/50 transition-colors"
+										<article
+											key={customer.id}
+											className="space-y-3 border-b p-4 last:border-b-0 md:rounded-2xl md:border md:bg-card md:p-5 md:shadow-sm md:last:border-b"
 										>
-											<CardContent className="p-5 space-y-4">
-												<div className="flex items-start justify-between">
-													<div className="min-w-0">
-														<button
-															type="button"
-															className="min-h-11 max-w-full text-left text-lg font-bold hover:underline"
-															onClick={() => openDetailDialog(cust)}
-														>
-															{cust.fullName}
-														</button>
-														<button
-															type="button"
-															onClick={() => {
-																window.location.href = `tel:${cust.phone}`;
-															}}
-															className="flex min-h-11 max-w-full items-center gap-1 break-all text-left text-xs text-muted-foreground"
-														>
-															<Phone className="h-3 w-3 shrink-0" />{" "}
-															{cust.phone}
-														</button>
-														{cust.email && (
-															<button
-																type="button"
-																onClick={() => {
-																	window.location.href = `mailto:${cust.email}`;
-																}}
-																className="flex min-h-11 max-w-full items-center gap-1 break-all text-left text-xs text-muted-foreground"
-															>
-																<Mail className="h-3 w-3 shrink-0" />{" "}
-																{cust.email}
-															</button>
-														)}
-													</div>
-													{cust.birthday && (
-														<Badge
-															variant="outline"
-															className="gap-1 text-[10px] bg-amber-500/10 text-amber-900 border-amber-500/30"
-														>
-															<Cake className="h-3 w-3 text-amber-600" />
-															{cust.birthday.slice(5, 10)}
-														</Badge>
-													)}
-												</div>
-
-												{/* Customer Metrics */}
-												<div className="grid grid-cols-3 gap-2 border-t border-b py-2 text-center text-xs">
-													<div>
-														<p className="font-bold text-primary text-sm">
-															${cust.totalSpent.toFixed(2)}
-														</p>
-														<p className="text-[10px] text-muted-foreground">
-															Total Gastado
-														</p>
-													</div>
-													<div>
-														<p className="font-bold text-emerald-600 text-sm">
-															{cust.completedCount}
-														</p>
-														<p className="text-[10px] text-muted-foreground">
-															Atendidas
-														</p>
-													</div>
-													<div>
-														<p className="font-bold text-amber-600 text-sm">
-															{cust.noShowCount}
-														</p>
-														<p className="text-[10px] text-muted-foreground">
-															No-Shows
-														</p>
-													</div>
-												</div>
-
-												{cust.notes && (
-													<p className="text-xs text-muted-foreground italic line-clamp-2 bg-muted/40 p-2 rounded">
-														Nota: {cust.notes}
-													</p>
-												)}
-
-												<div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-													<Button
-														size="sm"
+											<div className="flex items-start gap-3">
+												<button
+													type="button"
+													onClick={() => openDetailDialog(customer)}
+													className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-xl text-left transition-transform active:scale-[0.98]"
+												>
+													<span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+														<UserRound className="size-5" />
+													</span>
+													<span className="min-w-0">
+														<span className="block truncate font-bold">
+															{customer.fullName}
+														</span>
+														<span className="block text-xs text-muted-foreground">
+															{customer.completedCount} visitas atendidas
+														</span>
+													</span>
+												</button>
+												{customer.birthday && (
+													<Badge
 														variant="outline"
-														className="min-h-11 gap-1 text-xs"
-														onClick={() => openDetailDialog(cust)}
+														className="gap-1 border-amber-500/30 bg-amber-500/10 text-[10px] text-amber-800"
 													>
-														<FileText className="h-3.5 w-3.5" /> Ver Ficha
-													</Button>
+														<Cake className="size-3 text-amber-600" />
+														{customer.birthday.slice(5, 10)}
+													</Badge>
+												)}
+											</div>
 
-													{selectedTab === "birthdays" ? (
-														<button
-															type="button"
-															onClick={() =>
-																window.open(
-																	waBirthdayUrl,
-																	"_blank",
-																	"noopener,noreferrer",
-																)
-															}
-															className="flex min-h-11 items-center justify-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 text-xs font-bold text-amber-900 transition-colors hover:bg-amber-500/20"
-														>
-															<Cake className="h-3.5 w-3.5" /> Felicitar por WA
-														</button>
-													) : (
-														<button
-															type="button"
-															onClick={() =>
-																window.open(
-																	waUrl,
-																	"_blank",
-																	"noopener,noreferrer",
-																)
-															}
-															className="flex min-h-11 items-center justify-center gap-1 rounded-md border border-[#25D366]/30 bg-[#25D366]/10 px-3 text-xs font-medium text-[#25D366] transition-colors hover:bg-[#25D366]/20"
-														>
-															<MessageSquare className="h-3.5 w-3.5" /> WhatsApp
-														</button>
-													)}
+											<div className="divide-y rounded-xl bg-muted/35 px-3">
+												<a
+													href={`tel:${customer.phone}`}
+													className="flex min-h-11 items-center gap-2 break-all text-xs text-muted-foreground transition-opacity active:opacity-60"
+												>
+													<Phone className="size-3.5 shrink-0" />
+													{customer.phone}
+												</a>
+												{customer.email && (
+													<a
+														href={`mailto:${customer.email}`}
+														className="flex min-h-11 items-center gap-2 break-all text-xs text-muted-foreground transition-opacity active:opacity-60"
+													>
+														<Mail className="size-3.5 shrink-0" />
+														{customer.email}
+													</a>
+												)}
+											</div>
+
+											<div className="grid grid-cols-3 divide-x border-y py-2 text-center">
+												<div className="px-1">
+													<p className="text-sm font-bold text-primary">
+														${customer.totalSpent.toFixed(2)}
+													</p>
+													<p className="text-[10px] text-muted-foreground">
+														Gastado
+													</p>
 												</div>
-											</CardContent>
-										</Card>
+												<div className="px-1">
+													<p className="text-sm font-bold text-emerald-600">
+														{customer.completedCount}
+													</p>
+													<p className="text-[10px] text-muted-foreground">
+														Atendidas
+													</p>
+												</div>
+												<div className="px-1">
+													<p className="text-sm font-bold text-amber-600">
+														{customer.noShowCount}
+													</p>
+													<p className="text-[10px] text-muted-foreground">
+														No-shows
+													</p>
+												</div>
+											</div>
+
+											{customer.notes && (
+												<p className="line-clamp-2 rounded-lg bg-muted/35 px-3 py-2 text-xs italic text-muted-foreground">
+													Nota: {customer.notes}
+												</p>
+											)}
+
+											<div className="grid grid-cols-2 gap-2 pt-1">
+												<a
+													href={whatsappUrl}
+													target="_blank"
+													rel="noopener noreferrer"
+													className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#25D366]/30 bg-[#25D366]/10 px-3 text-xs font-bold text-[#168a43] transition active:scale-[0.98] active:opacity-80"
+												>
+													{selectedTab === "birthdays" ? (
+														<Cake className="size-4" />
+													) : (
+														<MessageSquare className="size-4" />
+													)}
+													{selectedTab === "birthdays"
+														? "Felicitar"
+														: "WhatsApp"}
+												</a>
+												<Button
+													type="button"
+													variant="outline"
+													className="min-h-11 rounded-xl text-xs active:scale-[0.98]"
+													onClick={() => openDetailDialog(customer)}
+												>
+													<CalendarClock className="size-4" /> Historial
+												</Button>
+											</div>
+										</article>
 									);
 								})}
 							</div>
@@ -381,187 +427,184 @@ export function CustomersView({
 				</Tabs>
 			</div>
 
-			{/* Customer Detail & History Modal */}
-			<Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-				<DialogContent className="max-h-[90dvh] max-w-2xl overflow-y-auto [&_input]:min-h-11">
-					<DialogHeader>
-						<DialogTitle>Ficha e Historial del Cliente</DialogTitle>
-					</DialogHeader>
-
-					{selectedCustomer && (
-						<div className="space-y-6">
-							{/* Customer Stats Header */}
-							<div className="grid grid-cols-1 gap-3 rounded-md border bg-muted/20 p-4 text-center min-[360px]:grid-cols-3">
-								<div>
-									<p className="text-xl font-bold text-primary">
-										${selectedCustomer.totalSpent.toFixed(2)}
-									</p>
-									<p className="text-xs text-muted-foreground">
-										Total Gastado (Citas Atendidas)
-									</p>
-								</div>
-								<div>
-									<p className="text-xl font-bold text-emerald-600">
-										{selectedCustomer.completedCount} visitas
-									</p>
-									<p className="text-xs text-muted-foreground">
-										Citas Atendidas
-									</p>
-								</div>
-								<div>
-									<p className="text-xl font-bold text-amber-600">
-										{selectedCustomer.noShowCount}
-									</p>
-									<p className="text-xs text-muted-foreground">No-Shows</p>
-								</div>
-							</div>
-
-							{/* Edit Customer Form */}
-							<form
-								onSubmit={handleUpdateCustomer}
-								className="space-y-3 border p-4 rounded-md"
+			<CustomerDetailsModal
+				open={isDetailDialogOpen}
+				onOpenChange={setIsDetailDialogOpen}
+			>
+				{selectedCustomer && (
+					<div className="space-y-5 [&_input]:min-h-11">
+						{errorMessage && (
+							<p
+								role="alert"
+								className="rounded-xl border border-destructive/20 bg-destructive/10 p-3 text-sm font-medium text-destructive"
 							>
-								<h4 className="font-bold text-sm border-b pb-2">
-									Datos Personales y Notas de Preferencia
-								</h4>
-								<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-									<div>
-										<Label htmlFor="ed-name">Nombre Completo</Label>
-										<Input
-											id="ed-name"
-											value={editName}
-											onChange={(e) => setEditName(e.target.value)}
-											required
-										/>
-									</div>
-									<div>
-										<Label htmlFor="ed-phone">Teléfono / WhatsApp</Label>
-										<Input
-											id="ed-phone"
-											value={editPhone}
-											onChange={(e) => setEditPhone(e.target.value)}
-											required
-										/>
-									</div>
-								</div>
+								{errorMessage}
+							</p>
+						)}
 
-								<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-									<div>
-										<Label htmlFor="ed-email">Correo Electrónico</Label>
-										<Input
-											id="ed-email"
-											type="email"
-											value={editEmail}
-											onChange={(e) => setEditEmail(e.target.value)}
-										/>
-									</div>
-									<div>
-										<Label htmlFor="ed-bday">Cumpleaños</Label>
-										<Input
-											id="ed-bday"
-											type="date"
-											value={editBirthday}
-											onChange={(e) => setEditBirthday(e.target.value)}
-										/>
-									</div>
-								</div>
+						<div className="grid grid-cols-3 divide-x rounded-2xl border bg-muted/20 py-3 text-center">
+							<div className="px-2">
+								<p className="font-bold text-primary">
+									${selectedCustomer.totalSpent.toFixed(2)}
+								</p>
+								<p className="text-[10px] text-muted-foreground">Gastado</p>
+							</div>
+							<div className="px-2">
+								<p className="font-bold text-emerald-600">
+									{selectedCustomer.completedCount}
+								</p>
+								<p className="text-[10px] text-muted-foreground">Visitas</p>
+							</div>
+							<div className="px-2">
+								<p className="font-bold text-amber-600">
+									{selectedCustomer.noShowCount}
+								</p>
+								<p className="text-[10px] text-muted-foreground">No-shows</p>
+							</div>
+						</div>
 
-								<div>
-									<Label htmlFor="ed-notes">
-										Notas / Preferencias Privadas
-									</Label>
+						<form
+							onSubmit={handleUpdateCustomer}
+							className="space-y-4 rounded-2xl border p-4"
+						>
+							<h4 className="border-b pb-3 text-sm font-bold">
+								Datos personales y preferencias
+							</h4>
+							<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+								<div className="space-y-1.5">
+									<Label htmlFor="ed-name">Nombre completo</Label>
 									<Input
-										id="ed-notes"
-										value={editNotes}
-										onChange={(e) => setEditNotes(e.target.value)}
-										placeholder="Preferencias, tintes, alergias..."
+										id="ed-name"
+										value={editName}
+										onChange={(event) => setEditName(event.target.value)}
+										required
 									/>
 								</div>
-
-								<div className="flex justify-end gap-2 pt-2">
-									<Button type="submit" size="sm" disabled={isPending}>
-										Guardar Cambios
-									</Button>
-								</div>
-							</form>
-
-							{/* Appointment History List */}
-							<div className="space-y-3">
-								<h4 className="font-bold text-sm flex items-center justify-between">
-									<span>
-										Historial de Citas ({selectedCustomer.appointments.length})
-									</span>
-									{selectedCustomer.lastVisitDate && (
-										<span className="text-xs text-muted-foreground font-normal">
-											Última visita: {selectedCustomer.lastVisitDate}
-										</span>
-									)}
-								</h4>
-
-								<div className="max-h-56 overflow-y-auto space-y-2 border rounded-md p-2">
-									{selectedCustomer.appointments.length === 0 ? (
-										<p className="text-xs text-muted-foreground text-center py-4">
-											Este cliente aún no tiene citas registradas.
-										</p>
-									) : (
-										selectedCustomer.appointments.map((appt) => (
-											<div
-												key={appt.id}
-												className="flex flex-col items-start justify-between gap-2 rounded-md border p-3 text-xs min-[390px]:flex-row min-[390px]:items-center"
-											>
-												<div>
-													<p className="font-bold">
-														{appt.appointmentDate} a las {appt.startTime}
-													</p>
-													<p className="text-muted-foreground">
-														{appt.servicesList} • Prof: {appt.specialistName}
-													</p>
-												</div>
-												<div className="space-y-1 min-[390px]:text-right">
-													<p className="font-bold text-primary">
-														${appt.totalPriceSnapshot.toFixed(2)}
-													</p>
-													<Badge
-														variant={
-															appt.status === "completed"
-																? "default"
-																: appt.status === "cancelled"
-																	? "destructive"
-																	: "secondary"
-														}
-													>
-														{appt.status}
-													</Badge>
-												</div>
-											</div>
-										))
-									)}
+								<div className="space-y-1.5">
+									<Label htmlFor="ed-phone">Teléfono / WhatsApp</Label>
+									<Input
+										id="ed-phone"
+										value={editPhone}
+										onChange={(event) => setEditPhone(event.target.value)}
+										required
+									/>
 								</div>
 							</div>
+							<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+								<div className="space-y-1.5">
+									<Label htmlFor="ed-email">Correo electrónico</Label>
+									<Input
+										id="ed-email"
+										type="email"
+										value={editEmail}
+										onChange={(event) => setEditEmail(event.target.value)}
+									/>
+								</div>
+								<div className="space-y-1.5">
+									<Label htmlFor="ed-bday">Cumpleaños</Label>
+									<Input
+										id="ed-bday"
+										type="date"
+										value={editBirthday}
+										onChange={(event) => setEditBirthday(event.target.value)}
+									/>
+								</div>
+							</div>
+							<div className="space-y-1.5">
+								<Label htmlFor="ed-notes">Notas / preferencias privadas</Label>
+								<Input
+									id="ed-notes"
+									value={editNotes}
+									onChange={(event) => setEditNotes(event.target.value)}
+									placeholder="Preferencias, tintes, alergias..."
+								/>
+							</div>
+							<Button
+								type="submit"
+								className="min-h-11 w-full active:scale-[0.98] sm:ml-auto sm:w-auto"
+								disabled={isPending}
+							>
+								{isPending ? "Guardando..." : "Guardar cambios"}
+							</Button>
+						</form>
 
-							<DialogFooter className="flex flex-col-reverse items-stretch justify-between gap-2 border-t pt-4 min-[390px]:flex-row min-[390px]:items-center">
-								<Button
-									variant="ghost"
-									size="sm"
-									className="min-h-11 gap-1 text-destructive hover:text-destructive"
-									onClick={() => handleDeleteCustomer(selectedCustomer.id)}
-									disabled={isPending}
-								>
-									<Trash2 className="h-4 w-4" /> Eliminar Cliente
-								</Button>
-								<Button
-									variant="outline"
-									size="sm"
-									className="min-h-11"
-									onClick={() => setIsDetailDialogOpen(false)}
-								>
-									Cerrar
-								</Button>
-							</DialogFooter>
+						<section
+							className="space-y-3"
+							aria-labelledby="customer-history-title"
+						>
+							<div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+								<h4 id="customer-history-title" className="text-sm font-bold">
+									Historial de citas ({selectedCustomer.appointments.length})
+								</h4>
+								{selectedCustomer.lastVisitDate && (
+									<span className="text-xs text-muted-foreground">
+										Última visita: {selectedCustomer.lastVisitDate}
+									</span>
+								)}
+							</div>
+							<div className="divide-y overflow-hidden rounded-2xl border bg-card">
+								{selectedCustomer.appointments.length === 0 ? (
+									<p className="p-6 text-center text-xs text-muted-foreground">
+										Este cliente aún no tiene citas registradas.
+									</p>
+								) : (
+									selectedCustomer.appointments.map((appointment) => (
+										<div
+											key={appointment.id}
+											className="flex min-h-16 items-center justify-between gap-3 p-3 text-xs"
+										>
+											<div className="min-w-0">
+												<p className="font-bold">
+													{appointment.appointmentDate} ·{" "}
+													{appointment.startTime}
+												</p>
+												<p className="truncate text-muted-foreground">
+													{appointment.servicesList} ·{" "}
+													{appointment.specialistName}
+												</p>
+											</div>
+											<div className="shrink-0 space-y-1 text-right">
+												<p className="font-bold text-primary">
+													${appointment.totalPriceSnapshot.toFixed(2)}
+												</p>
+												<Badge
+													variant={
+														appointment.status === "completed"
+															? "default"
+															: appointment.status === "cancelled"
+																? "destructive"
+																: "secondary"
+													}
+												>
+													{appointment.status}
+												</Badge>
+											</div>
+										</div>
+									))
+								)}
+							</div>
+						</section>
+
+						<div className="flex flex-col-reverse gap-2 border-t pt-4 min-[390px]:flex-row min-[390px]:justify-between">
+							<Button
+								variant="ghost"
+								className="min-h-11 text-destructive active:scale-[0.98] hover:text-destructive"
+								onClick={() => handleDeleteCustomer(selectedCustomer.id)}
+								disabled={isPending}
+							>
+								<Trash2 className="size-4" /> Eliminar cliente
+							</Button>
+							<Button
+								variant="outline"
+								className="min-h-11 active:scale-[0.98]"
+								onClick={() => setIsDetailDialogOpen(false)}
+							>
+								Cerrar
+							</Button>
 						</div>
-					)}
-				</DialogContent>
-			</Dialog>
+					</div>
+				)}
+			</CustomerDetailsModal>
 		</div>
 	);
 }

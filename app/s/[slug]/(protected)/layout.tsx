@@ -59,8 +59,8 @@ export default async function SalonLayout({
 	];
 
 	return (
-		<div className="flex min-h-dvh bg-background">
-			<aside className="hidden w-64 flex-col border-r bg-card md:flex">
+		<div className="flex h-dvh w-full overflow-hidden bg-background">
+			<aside className="hidden h-full w-64 shrink-0 flex-col border-r bg-card md:flex">
 				<div className="flex h-16 items-center border-b px-6">
 					<span className="text-lg font-bold text-primary">{salon.name}</span>
 				</div>
@@ -96,8 +96,8 @@ export default async function SalonLayout({
 				</div>
 			</aside>
 
-			<main className="flex min-w-0 flex-1 flex-col">
-				<header className="flex h-16 items-center justify-between gap-3 border-b bg-card px-4 sm:px-6">
+			<main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+				<header className="flex min-h-16 shrink-0 items-center justify-between gap-3 border-b bg-card pb-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 md:h-16 md:py-0">
 					<h1 className="min-w-0 truncate text-lg font-semibold md:hidden">
 						{salon.name}
 					</h1>
@@ -121,12 +121,14 @@ export default async function SalonLayout({
 					</div>
 				</header>
 				{remainingTrialDays !== null && (
-					<TrialBanner
-						salonName={salon.name}
-						remainingDays={remainingTrialDays}
-					/>
+					<div className="shrink-0">
+						<TrialBanner
+							salonName={salon.name}
+							remainingDays={remainingTrialDays}
+						/>
+					</div>
 				)}
-				<div className="protected-content flex-1 overflow-y-auto">
+				<div className="protected-content min-h-0 flex-1 overflow-y-auto overscroll-contain">
 					{children}
 				</div>
 			</main>

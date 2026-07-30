@@ -18,17 +18,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-	DialogFooter,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CreateManualAppointmentDialog } from "./create-manual-appointment-dialog";
 import { RescheduleAppointmentDialog } from "./reschedule-appointment-dialog";
+import { ResponsiveAppointmentModal } from "./responsive-appointment-modal";
 import { updateAppointmentStatus } from "@/app/actions/appointments";
 
 interface Customer {
@@ -101,6 +95,15 @@ const eventLabels = {
 	rescheduled: "Reprogramación",
 	reminder_24h: "Recordatorio",
 };
+const statusFilters = [
+	{ value: "all", label: "Todos" },
+	{ value: "confirmed", label: "Confirmadas" },
+	{ value: "completed", label: "Atendidas" },
+	{ value: "cancelled", label: "Canceladas" },
+	{ value: "no_show", label: "No asistió" },
+	{ value: "pending", label: "Pendientes" },
+];
+
 const resultLabels: Record<string, string> = {
 	missing_email: "correo ausente",
 	invalid_email: "correo inválido",
@@ -194,7 +197,7 @@ export function AppointmentsView({
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 	const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
-	// Dialog states for status changes & notes
+	// Adaptive modal states for status changes and notes.
 	const [activeAppointment, setActiveAppointment] =
 		useState<Appointment | null>(null);
 	const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
@@ -306,7 +309,7 @@ export function AppointmentsView({
 		}
 	}
 
-	// Filter appointments according to selected tab and dropdowns
+	// Filter appointments according to the selected tab and touch filters.
 	const filteredAppointments = appointments.filter((appt) => {
 		const apptDateStr = appt.appointmentDate.slice(0, 10);
 
@@ -318,14 +321,14 @@ export function AppointmentsView({
 		)
 			return false;
 
-		// Specialist dropdown filter
+		// Specialist pill filter
 		if (
 			filterSpecialistId !== "all" &&
 			appt.specialist?.id !== filterSpecialistId
 		)
 			return false;
 
-		// Status dropdown filter
+		// Status pill filter
 		if (filterStatus !== "all" && appt.status !== filterStatus) return false;
 
 		return true;
@@ -388,55 +391,85 @@ export function AppointmentsView({
 					<TabsList className="grid h-auto min-h-11 w-full grid-cols-3 sm:w-auto">
 						<TabsTrigger
 							value="today"
-							className="min-h-11 whitespace-normal text-xs font-bold"
+							className="min-h-11 whitespace-normal text-xs font-bold active:scale-[0.98]"
 						>
 							Citas de Hoy
 						</TabsTrigger>
 						<TabsTrigger
 							value="upcoming"
-							className="min-h-11 whitespace-normal text-xs font-bold"
+							className="min-h-11 whitespace-normal text-xs font-bold active:scale-[0.98]"
 						>
 							Próximas Citas
 						</TabsTrigger>
 						<TabsTrigger
 							value="all"
-							className="min-h-11 whitespace-normal text-xs font-bold"
+							className="min-h-11 whitespace-normal text-xs font-bold active:scale-[0.98]"
 						>
 							Todas
 						</TabsTrigger>
 					</TabsList>
 
-					{/* Filter dropdowns */}
-					<div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2 min-[390px]:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)]">
-						<Filter className="h-4 w-4 shrink-0 text-muted-foreground" />
-
-						<select
-							aria-label="Filtrar por especialista"
-							className="min-h-11 min-w-0 rounded-md border border-input bg-background px-2 text-xs font-medium"
-							value={filterSpecialistId}
-							onChange={(e) => setFilterSpecialistId(e.target.value)}
-						>
-							<option value="all">Todos los Especialistas</option>
-							{specialists.map((s) => (
-								<option key={s.id} value={s.id}>
-									{s.name}
-								</option>
-							))}
-						</select>
-
-						<select
-							aria-label="Filtrar por estado"
-							className="col-start-2 min-h-11 min-w-0 rounded-md border border-input bg-background px-2 text-xs font-medium min-[390px]:col-start-auto"
-							value={filterStatus}
-							onChange={(e) => setFilterStatus(e.target.value)}
-						>
-							<option value="all">Todos los Estados</option>
-							<option value="confirmed">Confirmadas</option>
-							<option value="completed">Atendidas</option>
-							<option value="cancelled">Canceladas</option>
-							<option value="no_show">No Asistió</option>
-							<option value="pending">Pendientes</option>
-						</select>
+					<div className="min-w-0 space-y-3 sm:max-w-2xl">
+						<div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+							<Filter className="h-4 w-4 shrink-0" />
+							Filtros rápidos
+						</div>
+						<fieldset className="min-w-0">
+							<legend className="sr-only">Filtrar por especialista</legend>
+							<div
+								role="group"
+								aria-label="Filtrar por especialista"
+								className="flex snap-x gap-2 overflow-x-auto pb-1"
+							>
+								{[{ id: "all", name: "Todos" }, ...specialists].map(
+									(specialist) => {
+										const isActive = filterSpecialistId === specialist.id;
+										return (
+											<button
+												type="button"
+												key={specialist.id}
+												onClick={() => setFilterSpecialistId(specialist.id)}
+												aria-pressed={isActive}
+												className={`min-h-11 shrink-0 snap-start rounded-full border px-4 text-xs font-semibold transition-all active:scale-[0.98] ${
+													isActive
+														? "border-primary bg-primary text-primary-foreground shadow-sm"
+														: "border-border bg-background text-muted-foreground hover:bg-muted"
+												}`}
+											>
+												{specialist.name}
+											</button>
+										);
+									},
+								)}
+							</div>
+						</fieldset>
+						<fieldset className="min-w-0">
+							<legend className="sr-only">Filtrar por estado</legend>
+							<div
+								role="group"
+								aria-label="Filtrar por estado"
+								className="flex snap-x gap-2 overflow-x-auto pb-1"
+							>
+								{statusFilters.map((status) => {
+									const isActive = filterStatus === status.value;
+									return (
+										<button
+											type="button"
+											key={status.value}
+											onClick={() => setFilterStatus(status.value)}
+											aria-pressed={isActive}
+											className={`min-h-11 shrink-0 snap-start rounded-full border px-4 text-xs font-semibold transition-all active:scale-[0.98] ${
+												isActive
+													? "border-primary bg-primary text-primary-foreground shadow-sm"
+													: "border-border bg-background text-muted-foreground hover:bg-muted"
+											}`}
+										>
+											{status.label}
+										</button>
+									);
+								})}
+							</div>
+						</fieldset>
 					</div>
 				</div>
 
@@ -473,7 +506,7 @@ export function AppointmentsView({
 								return (
 									<Card
 										key={appt.id}
-										className="overflow-hidden border-border/70 hover:border-primary/50 transition-colors"
+										className="overflow-hidden rounded-2xl border-border/60 bg-card shadow-sm transition-all active:scale-[0.98] md:rounded-xl md:hover:border-primary/50"
 									>
 										<CardContent className="flex min-w-0 flex-col justify-between gap-4 p-4 sm:p-5 md:flex-row md:items-center">
 											{/* Left info: Customer & Status */}
@@ -517,7 +550,7 @@ export function AppointmentsView({
 											</div>
 
 											{/* Right info: Date, Price & Actions */}
-											<div className="flex flex-col md:items-end justify-between gap-3 border-t md:border-t-0 pt-3 md:pt-0">
+											<div className="flex flex-col justify-between gap-3 border-t border-border/60 pt-3 md:items-end md:border-t-0 md:pt-0">
 												<div className="text-left md:text-right">
 													<p className="font-bold text-base flex items-center md:justify-end gap-1.5">
 														<Calendar className="h-4 w-4 text-primary" />{" "}
@@ -531,7 +564,7 @@ export function AppointmentsView({
 												</div>
 
 												{/* Quick Actions Buttons */}
-												<div className="flex flex-wrap items-center gap-1.5 pt-1">
+												<div className="grid grid-cols-2 items-center gap-2 pt-1 sm:flex sm:flex-wrap">
 													{customerPhone && (
 														<button
 															type="button"
@@ -542,7 +575,7 @@ export function AppointmentsView({
 																	"noopener,noreferrer",
 																)
 															}
-															className="min-h-11 px-3 text-xs gap-1 rounded-md border flex items-center justify-center font-medium bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366]/20 border-[#25D366]/30 transition-colors"
+															className="flex min-h-11 items-center justify-center gap-1 rounded-lg border border-[#25D366]/30 bg-[#25D366]/10 px-3 text-xs font-medium text-[#25D366] transition-all hover:bg-[#25D366]/20 active:scale-[0.98]"
 														>
 															<MessageSquare className="h-3.5 w-3.5" /> WhatsApp
 														</button>
@@ -578,7 +611,7 @@ export function AppointmentsView({
 														<Button
 															size="sm"
 															variant="outline"
-															className="min-h-11 text-xs gap-1 text-blue-600 hover:text-blue-700"
+															className="min-h-11 gap-1 text-xs text-blue-600 hover:text-blue-700 active:scale-[0.98]"
 															onClick={() =>
 																handleStatusChange(appt.id, "completed")
 															}
@@ -593,7 +626,7 @@ export function AppointmentsView({
 														<Button
 															size="sm"
 															variant="outline"
-															className="min-h-11 text-xs gap-1 text-amber-600 hover:text-amber-700"
+															className="min-h-11 gap-1 text-xs text-amber-600 hover:text-amber-700 active:scale-[0.98]"
 															onClick={() =>
 																handleStatusChange(appt.id, "no_show")
 															}
@@ -608,7 +641,7 @@ export function AppointmentsView({
 														<Button
 															size="sm"
 															variant="outline"
-															className="min-h-11 text-xs gap-1 text-destructive hover:text-destructive"
+															className="min-h-11 gap-1 text-xs text-destructive hover:text-destructive active:scale-[0.98]"
 															onClick={() => openCancelDialog(appt)}
 															disabled={isPending}
 															title="Cancelar cita"
@@ -621,7 +654,7 @@ export function AppointmentsView({
 														<Button
 															size="sm"
 															variant="outline"
-															className="min-h-11 text-xs gap-1 text-emerald-600"
+															className="min-h-11 gap-1 text-xs text-emerald-600 active:scale-[0.98]"
 															onClick={() =>
 																handleStatusChange(appt.id, "confirmed")
 															}
@@ -635,7 +668,7 @@ export function AppointmentsView({
 													<Button
 														size="sm"
 														variant="ghost"
-														className="min-h-11 min-w-11 text-xs gap-1 text-muted-foreground"
+														className="min-h-11 min-w-11 gap-1 text-xs text-muted-foreground active:scale-[0.98]"
 														onClick={() => openNotesDialog(appt)}
 														title="Editar notas internas"
 													>
@@ -652,41 +685,22 @@ export function AppointmentsView({
 				</TabsContent>
 			</Tabs>
 
-			{/* Cancellation Dialog */}
-			<Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
-				<DialogContent className="max-h-[90dvh] overflow-y-auto">
-					<DialogHeader>
-						<DialogTitle>Cancelar Cita</DialogTitle>
-					</DialogHeader>
-					<div className="space-y-4">
-						<p className="text-sm text-muted-foreground">
-							La cita quedará cancelada y su horario se liberará para recibir
-							nuevas reservas.
-						</p>
-						<div>
-							<Label htmlFor="cancel-reason">
-								Motivo de Cancelación (opcional)
-							</Label>
-							<Input
-								className="min-h-11"
-								id="cancel-reason"
-								value={cancellationReason}
-								onChange={(e) => setCancellationReason(e.target.value)}
-								placeholder="ej: Cliente solicitó cambio por teléfono..."
-							/>
-						</div>
-					</div>
-					<DialogFooter>
+			<ResponsiveAppointmentModal
+				open={isCancelDialogOpen}
+				onOpenChange={setIsCancelDialogOpen}
+				title="Cancelar cita"
+				footer={
+					<>
 						<Button
 							variant="outline"
-							className="min-h-11"
+							className="min-h-11 active:scale-[0.98]"
 							onClick={() => setIsCancelDialogOpen(false)}
 						>
 							Volver
 						</Button>
 						<Button
 							variant="destructive"
-							className="min-h-11"
+							className="min-h-11 active:scale-[0.98]"
 							disabled={isPending}
 							onClick={() =>
 								activeAppointment &&
@@ -697,52 +711,70 @@ export function AppointmentsView({
 								)
 							}
 						>
-							Confirmar Cancelación
+							Confirmar cancelación
 						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
-
-			{/* Notes Dialog */}
-			<Dialog open={isNotesDialogOpen} onOpenChange={setIsNotesDialogOpen}>
-				<DialogContent className="max-h-[90dvh] overflow-y-auto">
-					<DialogHeader>
-						<DialogTitle>Notas Internas de la Cita</DialogTitle>
-					</DialogHeader>
-					<div className="space-y-4">
-						<p className="text-xs text-muted-foreground">
-							Estas notas son privadas y solo visibles para el personal del
-							salón.
-						</p>
-						<div>
-							<Label htmlFor="notes-input">Observaciones</Label>
-							<Input
-								className="min-h-11"
-								id="notes-input"
-								value={internalNotesText}
-								onChange={(e) => setInternalNotesText(e.target.value)}
-								placeholder="Escribe detalles sobre el cliente o el servicio..."
-							/>
-						</div>
+					</>
+				}
+			>
+				<div className="space-y-4">
+					<p className="text-sm text-muted-foreground">
+						La cita quedará cancelada y su horario se liberará para recibir
+						nuevas reservas.
+					</p>
+					<div>
+						<Label htmlFor="cancel-reason">
+							Motivo de cancelación (opcional)
+						</Label>
+						<Input
+							className="min-h-11"
+							id="cancel-reason"
+							value={cancellationReason}
+							onChange={(event) => setCancellationReason(event.target.value)}
+							placeholder="ej: Cliente solicitó cambio por teléfono..."
+						/>
 					</div>
-					<DialogFooter>
+				</div>
+			</ResponsiveAppointmentModal>
+
+			<ResponsiveAppointmentModal
+				open={isNotesDialogOpen}
+				onOpenChange={setIsNotesDialogOpen}
+				title="Notas internas de la cita"
+				footer={
+					<>
 						<Button
 							variant="outline"
-							className="min-h-11"
+							className="min-h-11 active:scale-[0.98]"
 							onClick={() => setIsNotesDialogOpen(false)}
 						>
 							Cancelar
 						</Button>
 						<Button
-							className="min-h-11"
+							className="min-h-11 active:scale-[0.98]"
 							disabled={isPending}
 							onClick={handleSaveNotes}
 						>
-							Guardar Notas
+							Guardar notas
 						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
+					</>
+				}
+			>
+				<div className="space-y-4">
+					<p className="text-xs text-muted-foreground">
+						Estas notas son privadas y solo visibles para el personal del salón.
+					</p>
+					<div>
+						<Label htmlFor="notes-input">Observaciones</Label>
+						<Input
+							className="min-h-11"
+							id="notes-input"
+							value={internalNotesText}
+							onChange={(event) => setInternalNotesText(event.target.value)}
+							placeholder="Escribe detalles sobre el cliente o el servicio..."
+						/>
+					</div>
+				</div>
+			</ResponsiveAppointmentModal>
 		</div>
 	);
 }

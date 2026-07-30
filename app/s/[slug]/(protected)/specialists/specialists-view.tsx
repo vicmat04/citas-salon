@@ -2,17 +2,16 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Scissors, Clock, Trash2, Check } from "lucide-react";
+import { Check, Clock, Scissors, Trash2 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
 	Dialog,
 	DialogContent,
+	DialogFooter,
 	DialogHeader,
 	DialogTitle,
-	DialogFooter,
 } from "@/components/ui/dialog";
 import { CreateSpecialistDialog } from "./create-specialist-dialog";
 import {
@@ -57,18 +56,20 @@ export function SpecialistsView({
 	const [isPending, setIsPending] = useState(false);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-	function openServicesDialog(spec: Specialist) {
-		setSelectedSpecialist(spec);
-		setAssignedServiceIds(spec.specialistServices.map((ss) => ss.serviceId));
+	function openServicesDialog(specialist: Specialist) {
+		setSelectedSpecialist(specialist);
+		setAssignedServiceIds(
+			specialist.specialistServices.map((relation) => relation.serviceId),
+		);
 		setErrorMessage(null);
 		setIsServicesDialogOpen(true);
 	}
 
 	function toggleServiceSelection(serviceId: string) {
-		setAssignedServiceIds((prev) =>
-			prev.includes(serviceId)
-				? prev.filter((id) => id !== serviceId)
-				: [...prev, serviceId],
+		setAssignedServiceIds((currentIds) =>
+			currentIds.includes(serviceId)
+				? currentIds.filter((id) => id !== serviceId)
+				: [...currentIds, serviceId],
 		);
 	}
 
@@ -76,13 +77,11 @@ export function SpecialistsView({
 		if (!selectedSpecialist) return;
 		setIsPending(true);
 		setErrorMessage(null);
-
 		const result = await updateSpecialistServices(
 			selectedSpecialist.id,
 			assignedServiceIds,
 			slug,
 		);
-
 		setIsPending(false);
 		if (result.error) {
 			setErrorMessage(result.error);
@@ -99,99 +98,111 @@ export function SpecialistsView({
 	}
 
 	return (
-		<div className="space-y-6">
+		<div className="space-y-5 sm:space-y-6">
 			{errorMessage && (
-				<div className="rounded-md bg-destructive/15 p-4 text-sm text-destructive font-medium">
+				<div className="rounded-xl bg-destructive/15 p-4 text-sm font-medium text-destructive">
 					{errorMessage}
 				</div>
 			)}
 
-			<div className="flex items-center justify-between">
-				<div>
+			<header className="flex items-start justify-between gap-3 sm:items-center">
+				<div className="min-w-0">
 					<h2 className="text-2xl font-bold tracking-tight">Especialistas</h2>
-					<p className="text-muted-foreground">
+					<p className="text-sm text-muted-foreground sm:text-base">
 						Tu equipo de profesionales y los servicios que realizan.
 					</p>
 				</div>
-				<CreateSpecialistDialog slug={slug} />
-			</div>
+				<div className="shrink-0 active:scale-[0.98]">
+					<CreateSpecialistDialog slug={slug} />
+				</div>
+			</header>
 
-			<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-				{specialists.length === 0 && (
-					<div className="col-span-full py-12 text-center text-muted-foreground">
-						No tienes especialistas registrados. Añade uno para comenzar a
-						recibir citas.
-					</div>
-				)}
-				{specialists.map((specialist) => {
-					const assignedCount = specialist.specialistServices.length;
-					return (
-						<Card key={specialist.id}>
-							<CardContent className="p-6 flex flex-col items-center text-center space-y-4">
-								<Avatar className="h-20 w-20">
-									<AvatarFallback className="text-2xl bg-primary/10 text-primary font-bold">
-										{specialist.name.substring(0, 2).toUpperCase()}
-									</AvatarFallback>
-								</Avatar>
-								<div>
-									<h3 className="font-bold text-lg">{specialist.name}</h3>
-									<p className="text-sm text-muted-foreground">
-										{specialist.specialty || "Sin especialidad"}
-									</p>
-								</div>
-								<div className="flex items-center gap-2">
-									<Badge
-										variant={specialist.isActive ? "default" : "secondary"}
-									>
-										{specialist.isActive ? "Disponible" : "No disponible"}
-									</Badge>
-									<Badge variant="outline" className="gap-1">
-										<Scissors className="h-3 w-3" />
-										{assignedCount}{" "}
-										{assignedCount === 1 ? "servicio" : "servicios"}
-									</Badge>
-								</div>
-
-								<div className="w-full space-y-2 pt-2">
-									<Button
-										variant="outline"
-										className="w-full gap-2 text-xs"
-										onClick={() => openServicesDialog(specialist)}
-									>
-										<Scissors className="h-3.5 w-3.5" />
-										Asignar Servicios
-									</Button>
-									<Link href={`/s/${slug}/schedules`}>
-										<Button
-											variant="secondary"
-											className="w-full gap-2 text-xs mt-2"
+			{specialists.length === 0 ? (
+				<div className="rounded-2xl border bg-card px-6 py-12 text-center text-muted-foreground shadow-sm">
+					No tienes especialistas registrados. Añade uno para comenzar a recibir
+					citas.
+				</div>
+			) : (
+				<section aria-label="Equipo de especialistas" className="space-y-2">
+					<h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground md:hidden">
+						Equipo
+					</h3>
+					<div className="overflow-hidden rounded-2xl border bg-card shadow-sm md:grid md:grid-cols-2 md:gap-4 md:overflow-visible md:rounded-none md:border-0 md:bg-transparent md:shadow-none lg:grid-cols-3">
+						{specialists.map((specialist) => {
+							const assignedCount = specialist.specialistServices.length;
+							return (
+								<article
+									key={specialist.id}
+									className="border-b p-4 last:border-b-0 md:rounded-2xl md:border md:bg-card md:p-5 md:shadow-sm"
+								>
+									<div className="flex items-center gap-3 md:flex-col md:text-center">
+										<Avatar className="h-14 w-14 shrink-0 md:h-20 md:w-20">
+											<AvatarFallback className="bg-primary/10 text-lg font-bold text-primary md:text-2xl">
+												{specialist.name.substring(0, 2).toUpperCase()}
+											</AvatarFallback>
+										</Avatar>
+										<div className="min-w-0 flex-1 md:flex-none">
+											<h4 className="truncate text-base font-bold md:text-lg">
+												{specialist.name}
+											</h4>
+											<p className="truncate text-sm text-muted-foreground">
+												{specialist.specialty || "Sin especialidad"}
+											</p>
+										</div>
+										<Badge
+											variant={specialist.isActive ? "default" : "secondary"}
+											className="shrink-0"
 										>
-											<Clock className="h-3.5 w-3.5" />
-											Gestionar Horarios
-										</Button>
-									</Link>
-									<Button
-										variant="ghost"
-										className="w-full text-xs text-destructive hover:text-destructive gap-1 mt-1"
-										onClick={() => handleDelete(specialist.id)}
-										disabled={isPending}
-									>
-										<Trash2 className="h-3.5 w-3.5" />
-										Eliminar
-									</Button>
-								</div>
-							</CardContent>
-						</Card>
-					);
-				})}
-			</div>
+											{specialist.isActive ? "Disponible" : "No disponible"}
+										</Badge>
+									</div>
 
-			{/* Services Assignment Dialog */}
+									<div className="mt-4 flex min-h-11 items-center justify-between rounded-xl bg-muted/60 px-3 text-sm">
+										<span className="flex items-center gap-2 font-medium">
+											<Scissors className="h-4 w-4 text-muted-foreground" />
+											Servicios asignados
+										</span>
+										<strong>{assignedCount}</strong>
+									</div>
+
+									<div className="mt-3 grid grid-cols-2 gap-2">
+										<Button
+											type="button"
+											variant="outline"
+											className="min-h-11 gap-2 text-xs active:scale-[0.98]"
+											onClick={() => openServicesDialog(specialist)}
+										>
+											<Scissors className="h-4 w-4" />
+											Servicios
+										</Button>
+										<Link
+											href={`/s/${slug}/schedules`}
+											className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-secondary px-4 text-xs font-medium text-secondary-foreground transition hover:bg-secondary/80 active:scale-[0.98]"
+										>
+											<Clock className="h-4 w-4" /> Horarios
+										</Link>
+										<Button
+											type="button"
+											variant="ghost"
+											className="col-span-2 min-h-11 gap-2 text-xs text-destructive hover:text-destructive active:scale-[0.98]"
+											onClick={() => handleDelete(specialist.id)}
+											disabled={isPending}
+										>
+											<Trash2 className="h-4 w-4" /> Eliminar especialista
+										</Button>
+									</div>
+								</article>
+							);
+						})}
+					</div>
+				</section>
+			)}
+
 			<Dialog
 				open={isServicesDialogOpen}
 				onOpenChange={setIsServicesDialogOpen}
 			>
-				<DialogContent className="max-w-md">
+				<DialogContent className="max-h-[90dvh] max-w-md overflow-hidden rounded-t-2xl sm:rounded-lg">
 					<DialogHeader>
 						<DialogTitle>Servicios de {selectedSpecialist?.name}</DialogTitle>
 					</DialogHeader>
@@ -200,54 +211,64 @@ export function SpecialistsView({
 						realizar.
 					</p>
 
-					<div className="max-h-60 overflow-y-auto space-y-2 border rounded-md p-3 my-2">
+					<div className="smooth-scroll my-2 max-h-[50dvh] overflow-y-auto rounded-2xl border bg-muted/30 p-2">
 						{services.length === 0 ? (
-							<p className="text-xs text-muted-foreground text-center py-4">
+							<p className="py-6 text-center text-xs text-muted-foreground">
 								No hay servicios creados en el salón. Crea servicios primero en
 								la pestaña &quot;Servicios&quot;.
 							</p>
 						) : (
-							services.map((srv) => {
-								const isSelected = assignedServiceIds.includes(srv.id);
-								return (
-									<div
-										key={srv.id}
-										onClick={() => toggleServiceSelection(srv.id)}
-										className={`flex items-center justify-between p-2.5 rounded-md cursor-pointer border transition-colors ${
-											isSelected
-												? "border-primary bg-primary/5"
-												: "hover:bg-accent"
-										}`}
-									>
-										<div>
-											<p className="text-sm font-medium">{srv.name}</p>
-											<p className="text-xs text-muted-foreground">
-												${srv.price.toFixed(2)} • {srv.durationMinutes} min
-											</p>
-										</div>
-										<div
-											className={`h-5 w-5 rounded border flex items-center justify-center ${
-												isSelected
-													? "bg-primary border-primary text-primary-foreground"
-													: "border-muted-foreground"
+							<div className="overflow-hidden rounded-xl border bg-card">
+								{services.map((service) => {
+									const isSelected = assignedServiceIds.includes(service.id);
+									return (
+										<button
+											key={service.id}
+											type="button"
+											role="checkbox"
+											aria-checked={isSelected}
+											onClick={() => toggleServiceSelection(service.id)}
+											className={`flex min-h-14 w-full items-center justify-between gap-3 border-b px-3 py-2 text-left transition last:border-b-0 active:scale-[0.98] ${
+												isSelected ? "bg-primary/5" : "hover:bg-accent"
 											}`}
 										>
-											{isSelected && <Check className="h-3.5 w-3.5" />}
-										</div>
-									</div>
-								);
-							})
+											<span className="min-w-0">
+												<span className="block truncate text-sm font-medium">
+													{service.name}
+												</span>
+												<span className="block text-xs text-muted-foreground">
+													${service.price.toFixed(2)} •{" "}
+													{service.durationMinutes} min
+												</span>
+											</span>
+											<span
+												className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${isSelected ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/60 bg-background"}`}
+												aria-hidden="true"
+											>
+												{isSelected && <Check className="h-4 w-4" />}
+											</span>
+										</button>
+									);
+								})}
+							</div>
 						)}
 					</div>
 
-					<DialogFooter>
+					<DialogFooter className="grid grid-cols-2 gap-2 sm:flex">
 						<Button
+							type="button"
 							variant="outline"
 							onClick={() => setIsServicesDialogOpen(false)}
+							className="min-h-11 active:scale-[0.98]"
 						>
 							Cancelar
 						</Button>
-						<Button onClick={handleSaveServices} disabled={isPending}>
+						<Button
+							type="button"
+							onClick={handleSaveServices}
+							disabled={isPending}
+							className="min-h-11 active:scale-[0.98]"
+						>
 							Guardar Asignaciones
 						</Button>
 					</DialogFooter>

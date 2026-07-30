@@ -2,22 +2,21 @@
 
 import { useState } from "react";
 import {
-	Plus,
-	Trash2,
+	CheckCircle,
 	Edit,
 	FolderPlus,
-	CheckCircle,
+	Plus,
+	Trash2,
 	XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
 	Dialog,
 	DialogContent,
+	DialogFooter,
 	DialogHeader,
 	DialogTitle,
-	DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,16 +61,11 @@ export function ServicesView({
 	);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 	const [isPending, setIsPending] = useState(false);
-
-	// Dialog states
 	const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
 	const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 	const [categoryName, setCategoryName] = useState("");
-
 	const [isServiceDialogOpen, setIsServiceDialogOpen] = useState(false);
 	const [editingService, setEditingService] = useState<Service | null>(null);
-
-	// Service form fields
 	const [serviceName, setServiceName] = useState("");
 	const [serviceDescription, setServiceDescription] = useState("");
 	const [servicePrice, setServicePrice] = useState("0");
@@ -90,21 +84,20 @@ export function ServicesView({
 		setIsCategoryDialogOpen(true);
 	}
 
-	function openEditCategoryDialog(cat: Category) {
-		setEditingCategory(cat);
-		setCategoryName(cat.name);
+	function openEditCategoryDialog(category: Category) {
+		setEditingCategory(category);
+		setCategoryName(category.name);
 		setErrorMessage(null);
 		setIsCategoryDialogOpen(true);
 	}
 
-	async function handleCategorySubmit(e: React.FormEvent) {
-		e.preventDefault();
+	async function handleCategorySubmit(event: React.FormEvent) {
+		event.preventDefault();
 		setIsPending(true);
 		setErrorMessage(null);
 
 		const formData = new FormData();
 		formData.set("name", categoryName);
-
 		const result = editingCategory
 			? await updateCategory(editingCategory.id, formData, slug)
 			: await createCategory(formData, slug);
@@ -118,17 +111,13 @@ export function ServicesView({
 		}
 	}
 
-	async function handleDeleteCategory(catId: string) {
+	async function handleDeleteCategory(categoryId: string) {
 		if (!confirm("¿Estás seguro de eliminar esta categoría?")) return;
 		setIsPending(true);
 		setErrorMessage(null);
-
-		const result = await deleteCategory(catId, slug);
+		const result = await deleteCategory(categoryId, slug);
 		setIsPending(false);
-
-		if (result.error) {
-			setErrorMessage(result.error);
-		}
+		if (result.error) setErrorMessage(result.error);
 	}
 
 	function resetServiceForm() {
@@ -147,24 +136,24 @@ export function ServicesView({
 		setIsServiceDialogOpen(true);
 	}
 
-	function openEditServiceDialog(srv: Service) {
-		setEditingService(srv);
-		setServiceName(srv.name);
-		setServiceDescription(srv.description || "");
-		const priceNum =
-			typeof srv.price === "object" && "toNumber" in srv.price
-				? srv.price.toNumber()
-				: Number(srv.price);
-		setServicePrice(String(priceNum));
-		setServiceDuration(String(srv.durationMinutes));
-		setServiceBuffer(String(srv.bufferMinutes));
-		setServiceCategory(srv.categoryId || "");
+	function openEditServiceDialog(service: Service) {
+		setEditingService(service);
+		setServiceName(service.name);
+		setServiceDescription(service.description || "");
+		const price =
+			typeof service.price === "object" && "toNumber" in service.price
+				? service.price.toNumber()
+				: Number(service.price);
+		setServicePrice(String(price));
+		setServiceDuration(String(service.durationMinutes));
+		setServiceBuffer(String(service.bufferMinutes));
+		setServiceCategory(service.categoryId || "");
 		setErrorMessage(null);
 		setIsServiceDialogOpen(true);
 	}
 
-	async function handleServiceSubmit(e: React.FormEvent) {
-		e.preventDefault();
+	async function handleServiceSubmit(event: React.FormEvent) {
+		event.preventDefault();
 		setIsPending(true);
 		setErrorMessage(null);
 
@@ -175,7 +164,6 @@ export function ServicesView({
 		formData.set("durationMinutes", serviceDuration);
 		formData.set("bufferMinutes", serviceBuffer);
 		formData.set("categoryId", serviceCategory);
-
 		const result = editingService
 			? await updateService(editingService.id, formData, slug)
 			: await createService(formData, slug);
@@ -189,254 +177,290 @@ export function ServicesView({
 		}
 	}
 
-	async function handleToggleActive(srvId: string) {
+	async function handleToggleActive(serviceId: string) {
 		setIsPending(true);
-		await toggleServiceActive(srvId, slug);
+		await toggleServiceActive(serviceId, slug);
 		setIsPending(false);
 	}
 
-	async function handleDeleteService(srvId: string) {
+	async function handleDeleteService(serviceId: string) {
 		if (!confirm("¿Eliminar este servicio?")) return;
 		setIsPending(true);
-		await deleteService(srvId, slug);
+		await deleteService(serviceId, slug);
 		setIsPending(false);
 	}
 
 	const filteredServices = selectedCategoryId
-		? services.filter((s) => s.categoryId === selectedCategoryId)
+		? services.filter((service) => service.categoryId === selectedCategoryId)
 		: services;
 
 	return (
-		<div className="space-y-6">
+		<div className="space-y-5 sm:space-y-6">
 			{errorMessage && (
-				<div className="rounded-md bg-destructive/15 p-4 text-sm text-destructive font-medium flex justify-between items-center">
+				<div className="flex min-h-11 items-center justify-between gap-3 rounded-xl bg-destructive/15 px-4 py-2 text-sm font-medium text-destructive">
 					<span>{errorMessage}</span>
 					<button
+						type="button"
 						onClick={() => setErrorMessage(null)}
-						className="text-xs underline"
+						className="press-scale min-h-11 shrink-0 rounded-lg px-3 underline"
 					>
 						Cerrar
 					</button>
 				</div>
 			)}
 
-			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+			<header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 				<div>
 					<h2 className="text-2xl font-bold tracking-tight">
 						Catálogo de Servicios
 					</h2>
-					<p className="text-muted-foreground">
+					<p className="text-sm text-muted-foreground sm:text-base">
 						Administra las categorías, precios y duraciones de tus servicios.
 					</p>
 				</div>
-				<div className="flex items-center gap-2">
+				<div className="grid grid-cols-2 gap-2 sm:flex">
 					<Button
 						variant="outline"
 						onClick={openNewCategoryDialog}
-						className="gap-2"
+						className="min-h-11 gap-2 active:scale-[0.98]"
 					>
 						<FolderPlus className="h-4 w-4" />
-						Nueva Categoría
+						<span className="truncate">Categoría</span>
 					</Button>
-					<Button onClick={openNewServiceDialog} className="gap-2">
+					<Button
+						onClick={openNewServiceDialog}
+						className="min-h-11 gap-2 active:scale-[0.98]"
+					>
 						<Plus className="h-4 w-4" />
-						Nuevo Servicio
+						<span className="truncate">Servicio</span>
 					</Button>
 				</div>
-			</div>
+			</header>
 
-			{/* Category Tabs */}
-			<div className="flex flex-wrap items-center gap-2 border-b pb-3">
-				<button
-					onClick={() => setSelectedCategoryId(null)}
-					className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-						selectedCategoryId === null
-							? "bg-primary text-primary-foreground"
-							: "bg-muted text-muted-foreground hover:bg-accent"
-					}`}
+			<section aria-labelledby="service-categories-title" className="space-y-2">
+				<h3
+					id="service-categories-title"
+					className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
 				>
-					Todos ({services.length})
-				</button>
+					Categorías
+				</h3>
+				<div className="smooth-scroll -mx-1 overflow-x-auto px-1 pb-1">
+					<div className="flex w-max min-w-full gap-2 rounded-2xl bg-muted/60 p-2">
+						<button
+							type="button"
+							onClick={() => setSelectedCategoryId(null)}
+							aria-pressed={selectedCategoryId === null}
+							className={`min-h-11 rounded-xl px-4 text-sm font-semibold transition active:scale-[0.98] ${
+								selectedCategoryId === null
+									? "bg-background text-foreground shadow-sm ring-1 ring-border"
+									: "text-muted-foreground hover:bg-background/70"
+							}`}
+						>
+							Todos ({services.length})
+						</button>
+						{categories.map((category) => {
+							const count = services.filter(
+								(service) => service.categoryId === category.id,
+							).length;
+							const isSelected = selectedCategoryId === category.id;
+							return (
+								<div
+									key={category.id}
+									className={`flex overflow-hidden rounded-xl ring-1 ${
+										isSelected
+											? "bg-background ring-border shadow-sm"
+											: "ring-transparent"
+									}`}
+								>
+									<button
+										type="button"
+										onClick={() => setSelectedCategoryId(category.id)}
+										aria-pressed={isSelected}
+										className="min-h-11 px-4 text-sm font-semibold text-muted-foreground transition active:scale-[0.98] aria-pressed:text-foreground"
+									>
+										{category.name} ({count})
+									</button>
+									<button
+										type="button"
+										onClick={() => openEditCategoryDialog(category)}
+										className="min-h-11 min-w-11 border-l border-border/70 text-muted-foreground transition hover:text-foreground active:scale-[0.98]"
+										aria-label={`Editar categoría ${category.name}`}
+									>
+										<Edit className="mx-auto h-4 w-4" />
+									</button>
+									<button
+										type="button"
+										onClick={() => handleDeleteCategory(category.id)}
+										disabled={isPending}
+										className="min-h-11 min-w-11 border-l border-border/70 text-muted-foreground transition hover:text-destructive active:scale-[0.98]"
+										aria-label={`Eliminar categoría ${category.name}`}
+									>
+										<Trash2 className="mx-auto h-4 w-4" />
+									</button>
+								</div>
+							);
+						})}
+					</div>
+				</div>
+			</section>
 
-				{categories.map((cat) => {
-					const count = services.filter((s) => s.categoryId === cat.id).length;
-					const isSelected = selectedCategoryId === cat.id;
-					return (
-						<div key={cat.id} className="flex items-center gap-1">
-							<button
-								onClick={() => setSelectedCategoryId(cat.id)}
-								className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-									isSelected
-										? "bg-primary text-primary-foreground"
-										: "bg-muted text-muted-foreground hover:bg-accent"
-								}`}
-							>
-								{cat.name} ({count})
-							</button>
-							<button
-								onClick={() => openEditCategoryDialog(cat)}
-								className="text-muted-foreground hover:text-foreground p-1"
-								title="Editar categoría"
-							>
-								<Edit className="h-3.5 w-3.5" />
-							</button>
-							<button
-								onClick={() => handleDeleteCategory(cat.id)}
-								className="text-muted-foreground hover:text-destructive p-1"
-								title="Eliminar categoría"
-							>
-								<Trash2 className="h-3.5 w-3.5" />
-							</button>
-						</div>
-					);
-				})}
-			</div>
-
-			{/* Services Grid */}
 			{filteredServices.length === 0 ? (
-				<Card className="p-8 text-center">
+				<div className="rounded-2xl border bg-card p-8 text-center shadow-sm">
 					<p className="text-muted-foreground">
 						No hay servicios registrados en esta categoría.
 					</p>
-					<Button onClick={openNewServiceDialog} className="mt-4 gap-2">
+					<Button
+						onClick={openNewServiceDialog}
+						className="mt-4 min-h-11 gap-2 active:scale-[0.98]"
+					>
 						<Plus className="h-4 w-4" />
 						Crear primer servicio
 					</Button>
-				</Card>
+				</div>
 			) : (
-				<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-					{filteredServices.map((srv) => {
-						const priceNum =
-							typeof srv.price === "object" && "toNumber" in srv.price
-								? srv.price.toNumber()
-								: Number(srv.price);
-						const categoryName =
-							categories.find((c) => c.id === srv.categoryId)?.name ||
-							"Sin Categoría";
+				<section aria-label="Servicios" className="space-y-2">
+					<h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground md:hidden">
+						Servicios
+					</h3>
+					<div className="overflow-hidden rounded-2xl border bg-card shadow-sm md:grid md:grid-cols-2 md:gap-4 md:overflow-visible md:rounded-none md:border-0 md:bg-transparent md:shadow-none lg:grid-cols-3">
+						{filteredServices.map((service) => {
+							const price =
+								typeof service.price === "object" && "toNumber" in service.price
+									? service.price.toNumber()
+									: Number(service.price);
+							const categoryName =
+								categories.find(
+									(category) => category.id === service.categoryId,
+								)?.name || "Sin categoría";
 
-						return (
-							<Card
-								key={srv.id}
-								className={!srv.isActive ? "opacity-70 bg-muted/30" : ""}
-							>
-								<CardHeader className="pb-2">
-									<div className="flex items-start justify-between gap-2">
-										<div>
-											<CardTitle className="text-lg font-bold">
-												{srv.name}
-											</CardTitle>
-											<span className="text-xs text-muted-foreground font-medium">
+							return (
+								<article
+									key={service.id}
+									className={`border-b p-4 last:border-b-0 md:rounded-2xl md:border md:bg-card md:p-5 md:shadow-sm ${
+										service.isActive ? "" : "bg-muted/30 opacity-75"
+									}`}
+								>
+									<div className="flex items-start justify-between gap-3">
+										<div className="min-w-0">
+											<h4 className="truncate text-base font-bold sm:text-lg">
+												{service.name}
+											</h4>
+											<p className="text-xs font-medium text-muted-foreground">
 												{categoryName}
-											</span>
+											</p>
 										</div>
-										<Badge variant={srv.isActive ? "default" : "secondary"}>
-											{srv.isActive ? "Activo" : "Inactivo"}
+										<Badge variant={service.isActive ? "default" : "secondary"}>
+											{service.isActive ? "Activo" : "Inactivo"}
 										</Badge>
 									</div>
-									{srv.description && (
-										<p className="text-sm text-muted-foreground line-clamp-2 mt-1">
-											{srv.description}
+									{service.description && (
+										<p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+											{service.description}
 										</p>
 									)}
-								</CardHeader>
-								<CardContent className="space-y-4">
-									<div className="flex items-center justify-between border-t pt-3">
+									<div className="mt-4 flex items-end justify-between gap-3 border-t pt-3">
 										<div>
-											<p className="text-2xl font-bold text-primary">
-												${priceNum.toFixed(2)}
+											<p className="text-xl font-bold text-primary sm:text-2xl">
+												${price.toFixed(2)}
 											</p>
-											{priceNum === 0 && (
-												<span className="text-[10px] text-destructive font-semibold">
+											{price === 0 && (
+												<span className="text-[10px] font-semibold text-destructive">
 													No se muestra al cliente
 												</span>
 											)}
 										</div>
 										<div className="text-right text-xs text-muted-foreground">
 											<p>
-												<span className="font-semibold text-foreground">
-													{srv.durationMinutes} min
-												</span>{" "}
+												<strong className="text-foreground">
+													{service.durationMinutes} min
+												</strong>{" "}
 												servicio
 											</p>
 											<p>
-												<span className="font-semibold text-foreground">
-													{srv.bufferMinutes} min
-												</span>{" "}
+												<strong className="text-foreground">
+													{service.bufferMinutes} min
+												</strong>{" "}
 												descanso
 											</p>
 										</div>
 									</div>
-
-									<div className="flex items-center justify-end gap-2 border-t pt-2">
+									<div className="mt-3 grid grid-cols-3 gap-2 border-t pt-3">
 										<Button
-											size="sm"
+											type="button"
 											variant="ghost"
-											onClick={() => handleToggleActive(srv.id)}
+											onClick={() => handleToggleActive(service.id)}
 											disabled={isPending}
-											title={srv.isActive ? "Desactivar" : "Activar"}
+											className="min-h-11 gap-1 px-2 text-xs active:scale-[0.98]"
 										>
-											{srv.isActive ? (
-												<XCircle className="h-4 w-4 text-muted-foreground" />
+											{service.isActive ? (
+												<XCircle className="h-4 w-4" />
 											) : (
 												<CheckCircle className="h-4 w-4 text-emerald-600" />
 											)}
+											{service.isActive ? "Pausar" : "Activar"}
 										</Button>
 										<Button
-											size="sm"
+											type="button"
 											variant="ghost"
-											onClick={() => openEditServiceDialog(srv)}
+											onClick={() => openEditServiceDialog(service)}
 											disabled={isPending}
+											className="min-h-11 gap-1 px-2 text-xs active:scale-[0.98]"
 										>
-											<Edit className="h-4 w-4" />
+											<Edit className="h-4 w-4" /> Editar
 										</Button>
 										<Button
-											size="sm"
+											type="button"
 											variant="ghost"
-											className="text-destructive hover:text-destructive"
-											onClick={() => handleDeleteService(srv.id)}
+											onClick={() => handleDeleteService(service.id)}
 											disabled={isPending}
+											className="min-h-11 gap-1 px-2 text-xs text-destructive hover:text-destructive active:scale-[0.98]"
 										>
-											<Trash2 className="h-4 w-4" />
+											<Trash2 className="h-4 w-4" /> Eliminar
 										</Button>
 									</div>
-								</CardContent>
-							</Card>
-						);
-					})}
-				</div>
+								</article>
+							);
+						})}
+					</div>
+				</section>
 			)}
 
-			{/* Category Dialog */}
 			<Dialog
 				open={isCategoryDialogOpen}
 				onOpenChange={setIsCategoryDialogOpen}
 			>
-				<DialogContent>
+				<DialogContent className="max-w-md rounded-t-2xl sm:rounded-lg">
 					<DialogHeader>
 						<DialogTitle>
 							{editingCategory ? "Editar Categoría" : "Nueva Categoría"}
 						</DialogTitle>
 					</DialogHeader>
 					<form onSubmit={handleCategorySubmit} className="space-y-4">
-						<div>
+						<div className="space-y-2">
 							<Label htmlFor="cat-name">Nombre de Categoría</Label>
 							<Input
 								id="cat-name"
 								value={categoryName}
-								onChange={(e) => setCategoryName(e.target.value)}
+								onChange={(event) => setCategoryName(event.target.value)}
 								placeholder="ej: Cortes, Coloración, Manicura"
+								className="min-h-11"
 								required
 							/>
 						</div>
-						<DialogFooter>
+						<DialogFooter className="grid grid-cols-2 gap-2 sm:flex">
 							<Button
 								type="button"
 								variant="outline"
 								onClick={() => setIsCategoryDialogOpen(false)}
+								className="min-h-11 active:scale-[0.98]"
 							>
 								Cancelar
 							</Button>
-							<Button type="submit" disabled={isPending}>
+							<Button
+								type="submit"
+								disabled={isPending}
+								className="min-h-11 active:scale-[0.98]"
+							>
 								{editingCategory ? "Guardar Cambios" : "Crear Categoría"}
 							</Button>
 						</DialogFooter>
@@ -444,55 +468,67 @@ export function ServicesView({
 				</DialogContent>
 			</Dialog>
 
-			{/* Service Dialog */}
 			<Dialog open={isServiceDialogOpen} onOpenChange={setIsServiceDialogOpen}>
-				<DialogContent className="max-w-md">
+				<DialogContent className="max-h-[90dvh] max-w-md overflow-y-auto rounded-t-2xl sm:rounded-lg">
 					<DialogHeader>
 						<DialogTitle>
 							{editingService ? "Editar Servicio" : "Nuevo Servicio"}
 						</DialogTitle>
 					</DialogHeader>
 					<form onSubmit={handleServiceSubmit} className="space-y-4">
-						<div>
+						<div className="space-y-2">
 							<Label htmlFor="srv-name">Nombre del Servicio *</Label>
 							<Input
 								id="srv-name"
 								value={serviceName}
-								onChange={(e) => setServiceName(e.target.value)}
+								onChange={(event) => setServiceName(event.target.value)}
 								placeholder="ej: Corte Caballero, Balayage"
+								className="min-h-11"
 								required
 							/>
 						</div>
 
-						<div>
-							<Label htmlFor="srv-cat">Categoría</Label>
-							<select
-								id="srv-cat"
-								className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-								value={serviceCategory}
-								onChange={(e) => setServiceCategory(e.target.value)}
+						<fieldset className="space-y-2">
+							<legend className="text-sm font-medium">Categoría</legend>
+							<div
+								className="smooth-scroll flex gap-2 overflow-x-auto pb-1"
+								aria-label="Seleccionar categoría"
 							>
-								<option value="">-- Sin Categoría --</option>
-								{categories.map((c) => (
-									<option key={c.id} value={c.id}>
-										{c.name}
-									</option>
+								<button
+									type="button"
+									onClick={() => setServiceCategory("")}
+									aria-pressed={serviceCategory === ""}
+									className="min-h-11 shrink-0 rounded-full border px-4 text-sm font-medium transition active:scale-[0.98] aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground"
+								>
+									Sin categoría
+								</button>
+								{categories.map((category) => (
+									<button
+										key={category.id}
+										type="button"
+										onClick={() => setServiceCategory(category.id)}
+										aria-pressed={serviceCategory === category.id}
+										className="min-h-11 shrink-0 rounded-full border px-4 text-sm font-medium transition active:scale-[0.98] aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground"
+									>
+										{category.name}
+									</button>
 								))}
-							</select>
-						</div>
+							</div>
+						</fieldset>
 
-						<div>
+						<div className="space-y-2">
 							<Label htmlFor="srv-desc">Descripción</Label>
 							<Input
 								id="srv-desc"
 								value={serviceDescription}
-								onChange={(e) => setServiceDescription(e.target.value)}
+								onChange={(event) => setServiceDescription(event.target.value)}
 								placeholder="Detalle o productos incluidos..."
+								className="min-h-11"
 							/>
 						</div>
 
-						<div className="grid grid-cols-3 gap-3">
-							<div>
+						<div className="grid gap-3 sm:grid-cols-3">
+							<div className="space-y-2">
 								<Label htmlFor="srv-price">Precio ($)</Label>
 								<Input
 									id="srv-price"
@@ -500,45 +536,51 @@ export function ServicesView({
 									step="0.01"
 									min="0"
 									value={servicePrice}
-									onChange={(e) => setServicePrice(e.target.value)}
+									onChange={(event) => setServicePrice(event.target.value)}
+									className="min-h-11"
 									required
 								/>
 							</div>
-
-							<div>
+							<div className="space-y-2">
 								<Label htmlFor="srv-dur">Duración (min)</Label>
 								<Input
 									id="srv-dur"
 									type="number"
 									min="1"
 									value={serviceDuration}
-									onChange={(e) => setServiceDuration(e.target.value)}
+									onChange={(event) => setServiceDuration(event.target.value)}
+									className="min-h-11"
 									required
 								/>
 							</div>
-
-							<div>
+							<div className="space-y-2">
 								<Label htmlFor="srv-buf">Descanso (min)</Label>
 								<Input
 									id="srv-buf"
 									type="number"
 									min="0"
 									value={serviceBuffer}
-									onChange={(e) => setServiceBuffer(e.target.value)}
+									onChange={(event) => setServiceBuffer(event.target.value)}
+									className="min-h-11"
 									required
 								/>
 							</div>
 						</div>
 
-						<DialogFooter>
+						<DialogFooter className="grid grid-cols-2 gap-2 sm:flex">
 							<Button
 								type="button"
 								variant="outline"
 								onClick={() => setIsServiceDialogOpen(false)}
+								className="min-h-11 active:scale-[0.98]"
 							>
 								Cancelar
 							</Button>
-							<Button type="submit" disabled={isPending}>
+							<Button
+								type="submit"
+								disabled={isPending}
+								className="min-h-11 active:scale-[0.98]"
+							>
 								{editingService ? "Guardar Cambios" : "Crear Servicio"}
 							</Button>
 						</DialogFooter>
