@@ -17,7 +17,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CreateManualAppointmentDialog } from "./create-manual-appointment-dialog";
@@ -177,6 +176,48 @@ function NotificationDetails({ events }: { events: NotificationEvent[] }) {
 	);
 }
 
+type AgendaTab = "today" | "upcoming" | "all";
+
+export function filterAppointmentsForAgenda({
+	appointments,
+	todayStr,
+	selectedTab,
+	calendarDate,
+	filterSpecialistId,
+	filterStatus,
+}: {
+	appointments: Appointment[];
+	todayStr: string;
+	selectedTab: AgendaTab;
+	calendarDate: string | null;
+	filterSpecialistId: string;
+	filterStatus: string;
+}) {
+	return appointments.filter((appt) => {
+		const apptDateStr = appt.appointmentDate.slice(0, 10);
+
+		if (calendarDate && apptDateStr !== calendarDate) return false;
+		if (!calendarDate && selectedTab === "today" && apptDateStr !== todayStr)
+			return false;
+		if (
+			!calendarDate &&
+			selectedTab === "upcoming" &&
+			(apptDateStr <= todayStr || appt.status === "cancelled")
+		)
+			return false;
+
+		if (
+			filterSpecialistId !== "all" &&
+			appt.specialist?.id !== filterSpecialistId
+		)
+			return false;
+
+		if (filterStatus !== "all" && appt.status !== filterStatus) return false;
+
+		return true;
+	});
+}
+
 export function AppointmentsView({
 	slug,
 	appointments,
@@ -188,11 +229,11 @@ export function AppointmentsView({
 	specialists: Specialist[];
 	services: Service[];
 }) {
-	const [selectedTab, setSelectedTab] = useState<"today" | "upcoming" | "all">(
-		"today",
-	);
+	const [selectedTab, setSelectedTab] = useState<AgendaTab>("today");
 	const [filterSpecialistId, setFilterSpecialistId] = useState<string>("all");
 	const [filterStatus, setFilterStatus] = useState<string>("all");
+	const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+	const [calendarDate, setCalendarDate] = useState<string | null>(null);
 	const [isPending, setIsPending] = useState(false);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 	const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
@@ -310,28 +351,35 @@ export function AppointmentsView({
 	}
 
 	// Filter appointments according to the selected tab and touch filters.
-	const filteredAppointments = appointments.filter((appt) => {
-		const apptDateStr = appt.appointmentDate.slice(0, 10);
+	const appointmentCountsByDate = appointments.reduce(
+		(counts, appt) => {
+			const apptDateStr = appt.appointmentDate.slice(0, 10);
+			counts[apptDateStr] = (counts[apptDateStr] ?? 0) + 1;
+			return counts;
+		},
+		{} as Record<string, number>,
+	);
+	const agendaDays = Array.from({ length: 7 }, (_, index) => {
+		const date = new Date(`${todayStr}T00:00:00`);
+		date.setDate(date.getDate() + index);
+		const value = date.toISOString().slice(0, 10);
+		return {
+			value,
+			dayNumber: date.getDate(),
+			weekday: new Intl.DateTimeFormat("es-PA", { weekday: "short" })
+				.format(date)
+				.replace(".", ""),
+			count: appointmentCountsByDate[value] ?? 0,
+		};
+	});
 
-		// Tab filter
-		if (selectedTab === "today" && apptDateStr !== todayStr) return false;
-		if (
-			selectedTab === "upcoming" &&
-			(apptDateStr <= todayStr || appt.status === "cancelled")
-		)
-			return false;
-
-		// Specialist pill filter
-		if (
-			filterSpecialistId !== "all" &&
-			appt.specialist?.id !== filterSpecialistId
-		)
-			return false;
-
-		// Status pill filter
-		if (filterStatus !== "all" && appt.status !== filterStatus) return false;
-
-		return true;
+	const filteredAppointments = filterAppointmentsForAgenda({
+		appointments,
+		todayStr,
+		selectedTab,
+		calendarDate,
+		filterSpecialistId,
+		filterStatus,
 	});
 
 	return (
@@ -381,82 +429,161 @@ export function AppointmentsView({
 				</div>
 			</div>
 
-			{/* Navigation Tabs */}
-			<Tabs
-				defaultValue="today"
-				onValueChange={(v) => setSelectedTab(v as "today" | "upcoming" | "all")}
-				className="w-full"
-			>
-				<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-3">
-					<TabsList className="grid h-auto min-h-11 w-full grid-cols-3 sm:w-auto">
-						<TabsTrigger
-							value="today"
-							className="min-h-11 whitespace-normal text-xs font-bold active:scale-[0.98]"
-						>
-							Citas de Hoy
-						</TabsTrigger>
-						<TabsTrigger
-							value="upcoming"
-							className="min-h-11 whitespace-normal text-xs font-bold active:scale-[0.98]"
-						>
-							Próximas Citas
-						</TabsTrigger>
-						<TabsTrigger
-							value="all"
-							className="min-h-11 whitespace-normal text-xs font-bold active:scale-[0.98]"
-						>
-							Todas
-						</TabsTrigger>
-					</TabsList>
+			{/* Compact agenda controls */}
+			<div className="space-y-3 border-b pb-4">
+				<div
+					role="group"
+					aria-label="Vista de agenda"
+					className="grid grid-cols-2 gap-2 sm:grid-cols-4"
+				>
+					<button
+						type="button"
+						onClick={() => {
+							setSelectedTab("today");
+							setCalendarDate(todayStr);
+							setIsCalendarOpen(true);
+						}}
+						aria-pressed={selectedTab === "today" && calendarDate === todayStr}
+						className={`min-h-11 rounded-lg border px-2 text-xs font-semibold transition-all active:scale-[0.98] ${
+							selectedTab === "today" && calendarDate === todayStr
+								? "border-primary bg-primary text-primary-foreground shadow-sm"
+								: "border-border bg-card text-muted-foreground hover:bg-muted"
+						}`}
+					>
+						Citas de hoy
+					</button>
+					<button
+						type="button"
+						onClick={() => {
+							setSelectedTab("upcoming");
+							setCalendarDate(null);
+							setIsCalendarOpen(false);
+						}}
+						aria-pressed={selectedTab === "upcoming"}
+						className={`min-h-11 rounded-lg border px-2 text-xs font-semibold transition-all active:scale-[0.98] ${
+							selectedTab === "upcoming"
+								? "border-primary bg-primary text-primary-foreground shadow-sm"
+								: "border-border bg-card text-muted-foreground hover:bg-muted"
+						}`}
+					>
+						Próximas
+					</button>
+					<button
+						type="button"
+						onClick={() => {
+							if (isCalendarOpen) {
+								setIsCalendarOpen(false);
+								setCalendarDate(null);
+							} else {
+								setSelectedTab("today");
+								setCalendarDate(todayStr);
+								setIsCalendarOpen(true);
+							}
+						}}
+						aria-pressed={isCalendarOpen}
+						aria-expanded={isCalendarOpen}
+						className={`flex min-h-11 items-center justify-center gap-1 rounded-lg border px-2 text-xs font-semibold transition-all active:scale-[0.98] ${
+							isCalendarOpen
+								? "border-primary bg-primary text-primary-foreground shadow-sm"
+								: "border-border bg-card text-muted-foreground hover:bg-muted"
+						}`}
+					>
+						<Calendar className="h-3.5 w-3.5" /> Calendario
+					</button>
+					<button
+						type="button"
+						onClick={() => {
+							setSelectedTab("all");
+							setCalendarDate(null);
+							setIsCalendarOpen(false);
+						}}
+						aria-pressed={selectedTab === "all" && !calendarDate}
+						className={`min-h-11 rounded-lg border px-2 text-xs font-semibold transition-all active:scale-[0.98] ${
+							selectedTab === "all" && !calendarDate
+								? "border-primary bg-primary text-primary-foreground shadow-sm"
+								: "border-border bg-card text-muted-foreground hover:bg-muted"
+						}`}
+					>
+						Todas
+					</button>
+				</div>
 
-					<div className="min-w-0 space-y-3 sm:max-w-2xl">
-						<div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-							<Filter className="h-4 w-4 shrink-0" />
-							Filtros rápidos
-						</div>
-						<fieldset className="min-w-0">
-							<legend className="sr-only">Filtrar por especialista</legend>
-							<div
-								role="group"
-								aria-label="Filtrar por especialista"
-								className="flex snap-x gap-2 overflow-x-auto pb-1"
-							>
-								{[{ id: "all", name: "Todos" }, ...specialists].map(
-									(specialist) => {
-										const isActive = filterSpecialistId === specialist.id;
-										return (
-											<button
-												type="button"
-												key={specialist.id}
-												onClick={() => setFilterSpecialistId(specialist.id)}
-												aria-pressed={isActive}
-												className={`min-h-11 shrink-0 snap-start rounded-full border px-4 text-xs font-semibold transition-all active:scale-[0.98] ${
-													isActive
-														? "border-primary bg-primary text-primary-foreground shadow-sm"
-														: "border-border bg-background text-muted-foreground hover:bg-muted"
-												}`}
-											>
-												{specialist.name}
-											</button>
-										);
-									},
-								)}
+				{isCalendarOpen && (
+					<Card className="border-border/60 bg-card shadow-sm">
+						<CardContent className="space-y-3 p-3">
+							<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+								<div>
+									<p className="text-sm font-semibold">Agenda por fecha</p>
+									<p className="text-xs text-muted-foreground">
+										Elige un día para ver sus citas.
+									</p>
+								</div>
+								<Input
+									type="date"
+									aria-label="Elegir fecha de agenda"
+									className="min-h-11 w-full sm:w-auto"
+									value={calendarDate ?? todayStr}
+									onChange={(event) => {
+										setSelectedTab("today");
+										setCalendarDate(event.target.value || todayStr);
+									}}
+								/>
 							</div>
-						</fieldset>
-						<fieldset className="min-w-0">
-							<legend className="sr-only">Filtrar por estado</legend>
 							<div
 								role="group"
-								aria-label="Filtrar por estado"
+								aria-label="Días rápidos de la agenda"
 								className="flex snap-x gap-2 overflow-x-auto pb-1"
 							>
-								{statusFilters.map((status) => {
-									const isActive = filterStatus === status.value;
+								{agendaDays.map((day) => {
+									const isActive = calendarDate === day.value;
 									return (
 										<button
 											type="button"
-											key={status.value}
-											onClick={() => setFilterStatus(status.value)}
+											key={day.value}
+											onClick={() => {
+												setSelectedTab("today");
+												setCalendarDate(day.value);
+											}}
+											aria-pressed={isActive}
+											className={`flex min-h-14 min-w-16 shrink-0 snap-start flex-col items-center justify-center rounded-2xl border px-3 text-xs font-semibold transition-all active:scale-[0.98] ${
+												isActive
+													? "border-primary bg-primary text-primary-foreground shadow-sm"
+													: "border-border bg-background text-muted-foreground hover:bg-muted"
+											}`}
+										>
+											<span className="capitalize">{day.weekday}</span>
+											<span className="text-lg leading-5">{day.dayNumber}</span>
+											<span className="mt-1 rounded-full bg-current/15 px-1.5 text-[10px]">
+												{day.count} citas
+											</span>
+										</button>
+									);
+								})}
+							</div>
+						</CardContent>
+					</Card>
+				)}
+
+				<div className="min-w-0 space-y-3">
+					<div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+						<Filter className="h-4 w-4 shrink-0" />
+						Filtros rápidos
+					</div>
+					<fieldset className="min-w-0">
+						<legend className="sr-only">Filtrar por especialista</legend>
+						<div
+							role="group"
+							aria-label="Filtrar por especialista"
+							className="flex snap-x gap-2 overflow-x-auto pb-1"
+						>
+							{[{ id: "all", name: "Todos" }, ...specialists].map(
+								(specialist) => {
+									const isActive = filterSpecialistId === specialist.id;
+									return (
+										<button
+											type="button"
+											key={specialist.id}
+											onClick={() => setFilterSpecialistId(specialist.id)}
 											aria-pressed={isActive}
 											className={`min-h-11 shrink-0 snap-start rounded-full border px-4 text-xs font-semibold transition-all active:scale-[0.98] ${
 												isActive
@@ -464,226 +591,253 @@ export function AppointmentsView({
 													: "border-border bg-background text-muted-foreground hover:bg-muted"
 											}`}
 										>
-											{status.label}
+											{specialist.name}
 										</button>
 									);
-								})}
-							</div>
-						</fieldset>
-					</div>
-				</div>
-
-				<TabsContent value={selectedTab} className="mt-6">
-					{filteredAppointments.length === 0 ? (
-						<Card className="p-8 text-center sm:p-12">
-							<p className="text-muted-foreground font-medium">
-								No se encontraron citas para el filtro seleccionado.
-							</p>
-						</Card>
-					) : (
-						<div className="grid gap-4">
-							{filteredAppointments.map((appt) => {
-								const totalPriceNum =
-									typeof appt.totalPriceSnapshot === "object" &&
-									"toNumber" in appt.totalPriceSnapshot
-										? appt.totalPriceSnapshot.toNumber()
-										: Number(appt.totalPriceSnapshot);
-
-								const serviceNames =
-									appt.appointmentServices
-										.map((as) => as.service?.name)
-										.filter(Boolean)
-										.join(", ") || "Servicio";
-
-								const customerName = appt.customer?.fullName || "Cliente";
-								const customerPhone = appt.customer?.phone || "";
-								const specialistName = appt.specialist?.name || "Cualquiera";
-								const apptDateStr = appt.appointmentDate.slice(0, 10);
-
-								const cleanPhone = customerPhone.replace(/[^0-9]/g, "");
-								const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(`Hola ${customerName}, te escribimos de parte del salón respecto a tu cita del ${apptDateStr} a las ${appt.startTime}.`)}`;
-
+								},
+							)}
+						</div>
+					</fieldset>
+					<fieldset className="min-w-0">
+						<legend className="sr-only">Filtrar por estado</legend>
+						<div
+							role="group"
+							aria-label="Filtrar por estado"
+							className="flex snap-x gap-2 overflow-x-auto pb-1"
+						>
+							{statusFilters.map((status) => {
+								const isActive = filterStatus === status.value;
 								return (
-									<Card
-										key={appt.id}
-										className="overflow-hidden rounded-2xl border-border/60 bg-card shadow-sm transition-all active:scale-[0.98] md:rounded-xl md:hover:border-primary/50"
+									<button
+										type="button"
+										key={status.value}
+										onClick={() => setFilterStatus(status.value)}
+										aria-pressed={isActive}
+										className={`min-h-11 shrink-0 snap-start rounded-full border px-4 text-xs font-semibold transition-all active:scale-[0.98] ${
+											isActive
+												? "border-primary bg-primary text-primary-foreground shadow-sm"
+												: "border-border bg-background text-muted-foreground hover:bg-muted"
+										}`}
 									>
-										<CardContent className="flex min-w-0 flex-col justify-between gap-4 p-4 sm:p-5 md:flex-row md:items-center">
-											{/* Left info: Customer & Status */}
-											<div className="min-w-0 space-y-2">
-												<div className="flex flex-wrap items-center gap-2">
-													<h3 className="font-bold text-lg">{customerName}</h3>
-													{getStatusBadge(appt.status)}
-													{appt.source === "owner_panel" && (
-														<Badge variant="outline" className="text-[10px]">
-															Manual
-														</Badge>
-													)}
-												</div>
-
-												<div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground font-medium">
-													<div className="flex items-center gap-1">
-														<User className="h-3.5 w-3.5 text-primary" />
-														<span>{specialistName}</span>
-													</div>
-													<div className="flex items-center gap-1">
-														<Scissors className="h-3.5 w-3.5 text-primary" />
-														<span className="min-w-0 break-words">
-															{serviceNames} ({appt.totalDurationMinutes} min)
-														</span>
-													</div>
-												</div>
-
-												{appt.customerNotes && (
-													<p className="text-xs text-muted-foreground italic bg-muted/30 p-2 rounded">
-														Nota cliente: {appt.customerNotes}
-													</p>
-												)}
-												{appt.internalNotes && (
-													<p className="text-xs text-amber-900 bg-amber-500/10 p-2 rounded border border-amber-500/20 font-medium">
-														Nota interna: {appt.internalNotes}
-													</p>
-												)}
-												{appt.notifications.length > 0 && (
-													<NotificationDetails events={appt.notifications} />
-												)}
-											</div>
-
-											{/* Right info: Date, Price & Actions */}
-											<div className="flex flex-col justify-between gap-3 border-t border-border/60 pt-3 md:items-end md:border-t-0 md:pt-0">
-												<div className="text-left md:text-right">
-													<p className="font-bold text-base flex items-center md:justify-end gap-1.5">
-														<Calendar className="h-4 w-4 text-primary" />{" "}
-														{apptDateStr}
-														<Clock className="h-4 w-4 text-primary ml-2" />{" "}
-														{appt.startTime}
-													</p>
-													<p className="text-xl font-extrabold text-primary mt-0.5">
-														${totalPriceNum.toFixed(2)}
-													</p>
-												</div>
-
-												{/* Quick Actions Buttons */}
-												<div className="grid grid-cols-2 items-center gap-2 pt-1 sm:flex sm:flex-wrap">
-													{customerPhone && (
-														<button
-															type="button"
-															onClick={() =>
-																window.open(
-																	waUrl,
-																	"_blank",
-																	"noopener,noreferrer",
-																)
-															}
-															className="flex min-h-11 items-center justify-center gap-1 rounded-lg border border-[#25D366]/30 bg-[#25D366]/10 px-3 text-xs font-medium text-[#25D366] transition-all hover:bg-[#25D366]/20 active:scale-[0.98]"
-														>
-															<MessageSquare className="h-3.5 w-3.5" /> WhatsApp
-														</button>
-													)}
-
-													{(appt.status === "pending" ||
-														appt.status === "confirmed") && (
-														<RescheduleAppointmentDialog
-															slug={slug}
-															appointment={{
-																id: appt.id,
-																appointmentDate: appt.appointmentDate,
-																startTime: appt.startTime,
-																specialistId: appt.specialist?.id,
-																serviceIds: appt.appointmentServices
-																	.map((item) => item.service?.id)
-																	.filter((id): id is string => Boolean(id)),
-															}}
-															services={services}
-															specialists={specialists}
-															disabled={isPending}
-															onRescheduled={(notificationState) =>
-																setFeedbackMessage(
-																	notificationState === "queued"
-																		? "Cita actualizada. Notificación en proceso."
-																		: "Cita actualizada.",
-																)
-															}
-														/>
-													)}
-
-													{appt.status !== "completed" && (
-														<Button
-															size="sm"
-															variant="outline"
-															className="min-h-11 gap-1 text-xs text-blue-600 hover:text-blue-700 active:scale-[0.98]"
-															onClick={() =>
-																handleStatusChange(appt.id, "completed")
-															}
-															disabled={isPending}
-															title="Marcar como Atendida"
-														>
-															<CheckCircle className="h-3.5 w-3.5" /> Atendida
-														</Button>
-													)}
-
-													{appt.status !== "no_show" && (
-														<Button
-															size="sm"
-															variant="outline"
-															className="min-h-11 gap-1 text-xs text-amber-600 hover:text-amber-700 active:scale-[0.98]"
-															onClick={() =>
-																handleStatusChange(appt.id, "no_show")
-															}
-															disabled={isPending}
-															title="Marcar como No Asistió"
-														>
-															<AlertCircle className="h-3.5 w-3.5" /> No Asistió
-														</Button>
-													)}
-
-													{appt.status !== "cancelled" && (
-														<Button
-															size="sm"
-															variant="outline"
-															className="min-h-11 gap-1 text-xs text-destructive hover:text-destructive active:scale-[0.98]"
-															onClick={() => openCancelDialog(appt)}
-															disabled={isPending}
-															title="Cancelar cita"
-														>
-															<XCircle className="h-3.5 w-3.5" /> Cancelar
-														</Button>
-													)}
-
-													{appt.status === "cancelled" && (
-														<Button
-															size="sm"
-															variant="outline"
-															className="min-h-11 gap-1 text-xs text-emerald-600 active:scale-[0.98]"
-															onClick={() =>
-																handleStatusChange(appt.id, "confirmed")
-															}
-															disabled={isPending}
-															title="Reabrir Cita"
-														>
-															<RefreshCw className="h-3.5 w-3.5" /> Reabrir
-														</Button>
-													)}
-
-													<Button
-														size="sm"
-														variant="ghost"
-														className="min-h-11 min-w-11 gap-1 text-xs text-muted-foreground active:scale-[0.98]"
-														onClick={() => openNotesDialog(appt)}
-														title="Editar notas internas"
-													>
-														<FileText className="h-3.5 w-3.5" />
-													</Button>
-												</div>
-											</div>
-										</CardContent>
-									</Card>
+										{status.label}
+									</button>
 								);
 							})}
 						</div>
-					)}
-				</TabsContent>
-			</Tabs>
+					</fieldset>
+				</div>
+			</div>
+
+			<div className="mt-6">
+				{filteredAppointments.length === 0 ? (
+					<Card className="p-8 text-center sm:p-12">
+						<p className="text-muted-foreground font-medium">
+							No se encontraron citas para el filtro seleccionado.
+						</p>
+					</Card>
+				) : (
+					<div className="grid gap-4">
+						{filteredAppointments.map((appt) => {
+							const totalPriceNum =
+								typeof appt.totalPriceSnapshot === "object" &&
+								"toNumber" in appt.totalPriceSnapshot
+									? appt.totalPriceSnapshot.toNumber()
+									: Number(appt.totalPriceSnapshot);
+
+							const serviceNames =
+								appt.appointmentServices
+									.map((as) => as.service?.name)
+									.filter(Boolean)
+									.join(", ") || "Servicio";
+
+							const customerName = appt.customer?.fullName || "Cliente";
+							const customerPhone = appt.customer?.phone || "";
+							const specialistName = appt.specialist?.name || "Cualquiera";
+							const apptDateStr = appt.appointmentDate.slice(0, 10);
+
+							const cleanPhone = customerPhone.replace(/[^0-9]/g, "");
+							const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(`Hola ${customerName}, te escribimos de parte del salón respecto a tu cita del ${apptDateStr} a las ${appt.startTime}.`)}`;
+
+							return (
+								<Card
+									key={appt.id}
+									className="overflow-hidden rounded-2xl border-border/60 bg-card shadow-sm transition-all active:scale-[0.98] md:rounded-xl md:hover:border-primary/50"
+								>
+									<CardContent className="flex min-w-0 flex-col justify-between gap-4 p-4 sm:p-5 md:flex-row md:items-center">
+										{/* Left info: Customer & Status */}
+										<div className="min-w-0 space-y-2">
+											<div className="flex flex-wrap items-center gap-2">
+												<h3 className="font-bold text-lg">{customerName}</h3>
+												{getStatusBadge(appt.status)}
+												{appt.source === "owner_panel" && (
+													<Badge variant="outline" className="text-[10px]">
+														Manual
+													</Badge>
+												)}
+											</div>
+
+											<div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground font-medium">
+												<div className="flex items-center gap-1">
+													<User className="h-3.5 w-3.5 text-primary" />
+													<span>{specialistName}</span>
+												</div>
+												<div className="flex items-center gap-1">
+													<Scissors className="h-3.5 w-3.5 text-primary" />
+													<span className="min-w-0 break-words">
+														{serviceNames} ({appt.totalDurationMinutes} min)
+													</span>
+												</div>
+											</div>
+
+											{appt.customerNotes && (
+												<p className="text-xs text-muted-foreground italic bg-muted/30 p-2 rounded">
+													Nota cliente: {appt.customerNotes}
+												</p>
+											)}
+											{appt.internalNotes && (
+												<p className="text-xs text-amber-900 bg-amber-500/10 p-2 rounded border border-amber-500/20 font-medium">
+													Nota interna: {appt.internalNotes}
+												</p>
+											)}
+											{appt.notifications.length > 0 && (
+												<NotificationDetails events={appt.notifications} />
+											)}
+										</div>
+
+										{/* Right info: Date, Price & Actions */}
+										<div className="flex flex-col justify-between gap-3 border-t border-border/60 pt-3 md:items-end md:border-t-0 md:pt-0">
+											<div className="text-left md:text-right">
+												<p className="font-bold text-base flex items-center md:justify-end gap-1.5">
+													<Calendar className="h-4 w-4 text-primary" />{" "}
+													{apptDateStr}
+													<Clock className="h-4 w-4 text-primary ml-2" />{" "}
+													{appt.startTime}
+												</p>
+												<p className="text-xl font-extrabold text-primary mt-0.5">
+													${totalPriceNum.toFixed(2)}
+												</p>
+											</div>
+
+											{/* Quick Actions Buttons */}
+											<div className="grid grid-cols-2 items-center gap-2 pt-1 sm:flex sm:flex-wrap">
+												{customerPhone && (
+													<button
+														type="button"
+														onClick={() =>
+															window.open(
+																waUrl,
+																"_blank",
+																"noopener,noreferrer",
+															)
+														}
+														className="flex min-h-11 items-center justify-center gap-1 rounded-lg border border-[#25D366]/30 bg-[#25D366]/10 px-3 text-xs font-medium text-[#25D366] transition-all hover:bg-[#25D366]/20 active:scale-[0.98]"
+													>
+														<MessageSquare className="h-3.5 w-3.5" /> WhatsApp
+													</button>
+												)}
+
+												{(appt.status === "pending" ||
+													appt.status === "confirmed") && (
+													<RescheduleAppointmentDialog
+														slug={slug}
+														appointment={{
+															id: appt.id,
+															appointmentDate: appt.appointmentDate,
+															startTime: appt.startTime,
+															specialistId: appt.specialist?.id,
+															serviceIds: appt.appointmentServices
+																.map((item) => item.service?.id)
+																.filter((id): id is string => Boolean(id)),
+														}}
+														services={services}
+														specialists={specialists}
+														disabled={isPending}
+														onRescheduled={(notificationState) =>
+															setFeedbackMessage(
+																notificationState === "queued"
+																	? "Cita actualizada. Notificación en proceso."
+																	: "Cita actualizada.",
+															)
+														}
+													/>
+												)}
+
+												{appt.status !== "completed" && (
+													<Button
+														size="sm"
+														variant="outline"
+														className="min-h-11 gap-1 text-xs text-blue-600 hover:text-blue-700 active:scale-[0.98]"
+														onClick={() =>
+															handleStatusChange(appt.id, "completed")
+														}
+														disabled={isPending}
+														title="Marcar como Atendida"
+													>
+														<CheckCircle className="h-3.5 w-3.5" /> Atendida
+													</Button>
+												)}
+
+												{appt.status !== "no_show" && (
+													<Button
+														size="sm"
+														variant="outline"
+														className="min-h-11 gap-1 text-xs text-amber-600 hover:text-amber-700 active:scale-[0.98]"
+														onClick={() =>
+															handleStatusChange(appt.id, "no_show")
+														}
+														disabled={isPending}
+														title="Marcar como No Asistió"
+													>
+														<AlertCircle className="h-3.5 w-3.5" /> No Asistió
+													</Button>
+												)}
+
+												{appt.status !== "cancelled" && (
+													<Button
+														size="sm"
+														variant="outline"
+														className="min-h-11 gap-1 text-xs text-destructive hover:text-destructive active:scale-[0.98]"
+														onClick={() => openCancelDialog(appt)}
+														disabled={isPending}
+														title="Cancelar cita"
+													>
+														<XCircle className="h-3.5 w-3.5" /> Cancelar
+													</Button>
+												)}
+
+												{appt.status === "cancelled" && (
+													<Button
+														size="sm"
+														variant="outline"
+														className="min-h-11 gap-1 text-xs text-emerald-600 active:scale-[0.98]"
+														onClick={() =>
+															handleStatusChange(appt.id, "confirmed")
+														}
+														disabled={isPending}
+														title="Reabrir Cita"
+													>
+														<RefreshCw className="h-3.5 w-3.5" /> Reabrir
+													</Button>
+												)}
+
+												<Button
+													size="sm"
+													variant="ghost"
+													className="min-h-11 min-w-11 gap-1 text-xs text-muted-foreground active:scale-[0.98]"
+													onClick={() => openNotesDialog(appt)}
+													title="Editar notas internas"
+												>
+													<FileText className="h-3.5 w-3.5" />
+												</Button>
+											</div>
+										</div>
+									</CardContent>
+								</Card>
+							);
+						})}
+					</div>
+				)}
+			</div>
 
 			<ResponsiveAppointmentModal
 				open={isCancelDialogOpen}
